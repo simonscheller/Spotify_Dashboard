@@ -83,8 +83,8 @@ export default function Page() {
   const currentWeek = useMemo(() => getISOWeek(new Date()), []);
   const lastWeek = useMemo(() => (currentWeek > 1 ? currentWeek - 1 : 52), [currentWeek]);
 
-  const [timeRange, setTimeRange] = useState<TimeRange>("this_month");
-  const [minScore, setMinScore] = useState<number>(0.5);
+  const [timeRange, setTimeRange] = useState<TimeRange>("all");
+  const [minScore, setMinScore] = useState<number>(0.0);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
