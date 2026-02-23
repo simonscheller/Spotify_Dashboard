@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180" role="img" aria-label="Spotify">
+  <title>Spotify</title>
+  <circle cx="88" cy="90" r="74" fill="#1DB954" />
+  <path d="M45 78c31-10 67-8 96 7" fill="none" stroke="#0e0f12" stroke-width="11" stroke-linecap="round" opacity="0.93" />
+  <path d="M50 100c27-8 54-6 77 5" fill="none" stroke="#0e0f12" stroke-width="9.5" stroke-linecap="round" opacity="0.89" />
+  <path d="M56 121c20-6 41-4 57 4" fill="none" stroke="#0e0f12" stroke-width="8.5" stroke-linecap="round" opacity="0.86" />
+  <text x="182" y="118" fill="#1ED760" font-size="92" font-family="Arial, Helvetica, sans-serif" font-weight="700" letter-spacing="-2">
+    Spotify
+  </text>
+</svg>

@@ -375,19 +375,19 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-zinc-100">
+    <div className="min-h-screen bg-[#13151a] text-zinc-100">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_0%,rgba(29,185,84,0.14),rgba(0,0,0,0))]" />
 
-      <header className="border-b border-zinc-800/90 bg-zinc-900/85 backdrop-blur">
+      <header className="border-b border-zinc-800/80 bg-zinc-900/75 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="rounded-full bg-zinc-800 p-1.5 ring-1 ring-zinc-700/80">
-                <img src="/spotify-mark.svg" alt="Spotify" className="h-8 w-8" draggable={false} />
+              <div className="rounded-2xl bg-zinc-800/80 p-2 ring-1 ring-zinc-700/70">
+                <img src="/spotify-wordmark.svg" alt="Spotify" className="h-8 w-auto sm:h-9" draggable={false} />
               </div>
               <div>
-                <p className="text-sm text-zinc-400">Spotify</p>
-                <h1 className="text-2xl font-semibold tracking-tight">Spotify Trend Radar</h1>
+                <p className="text-xs text-zinc-400">Spotify</p>
+                <h1 className="text-[1.7rem] font-semibold tracking-tight sm:text-[1.9rem]">Trend Radar</h1>
               </div>
             </div>
 
@@ -397,11 +397,11 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-zinc-700/80 bg-zinc-800/50 p-4 sm:p-5">
+          <div className="mt-5 rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-4 sm:p-5">
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-[auto_auto_1fr_1fr] lg:items-end">
               <div className="space-y-2">
-                <p className="text-xs text-zinc-400">Zeitraum</p>
-                <div className="flex items-center gap-1 rounded-xl border border-zinc-700 bg-zinc-900/70 p-1">
+                <p className="text-[11px] text-zinc-400">Zeitraum</p>
+                <div className="flex items-center gap-1 rounded-2xl border border-zinc-700 bg-zinc-900/65 p-1">
                   {([
                     ["week", "KW"],
                     ["day", "Tag"],
@@ -412,7 +412,7 @@ export default function Page() {
                       type="button"
                       onClick={() => setGroupBy(value)}
                       className={cx(
-                        "rounded-lg px-4 py-2 text-sm font-medium transition",
+                        "rounded-xl px-4 py-2 text-sm font-medium transition",
                         groupBy === value
                           ? "bg-zinc-200 text-zinc-900"
                           : "text-zinc-300 hover:bg-zinc-800"
@@ -425,12 +425,12 @@ export default function Page() {
               </div>
 
               <div className="space-y-2">
-                <p className="text-xs text-zinc-400">Auswahl</p>
+                <p className="text-[11px] text-zinc-400">Auswahl</p>
                 <div className="relative">
                   <select
                     value={selectedSlot}
                     onChange={(e) => setSelectedSlot(e.target.value)}
-                    className="h-11 min-w-[180px] appearance-none rounded-xl border border-zinc-700 bg-zinc-900/70 px-3 pr-10 text-sm text-zinc-100 outline-none focus:border-[#1DB954]/60"
+                    className="h-11 min-w-[180px] appearance-none rounded-2xl border border-zinc-700 bg-zinc-900/65 px-3 pr-10 text-sm text-zinc-100 outline-none focus:border-[#1DB954]/60"
                   >
                     <option value="all">
                       {groupBy === "week"
@@ -450,12 +450,12 @@ export default function Page() {
               </div>
 
               <div className="space-y-2">
-                <p className="text-xs text-zinc-400">Kategorie Filter</p>
+                <p className="text-[11px] text-zinc-400">Kategorie Filter</p>
                 <div className="relative">
                   <select
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="h-11 w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/70 px-3 pr-10 text-sm text-zinc-100 outline-none focus:border-[#1DB954]/60"
+                    className="h-11 w-full appearance-none rounded-2xl border border-zinc-700 bg-zinc-900/65 px-3 pr-10 text-sm text-zinc-100 outline-none focus:border-[#1DB954]/60"
                   >
                     <option value="all">Alle Kategorien</option>
                     {categories.map((c) => (
@@ -470,7 +470,7 @@ export default function Page() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <p className="text-zinc-400">Min. Relevanz Score</p>
+                  <p className="text-zinc-400 text-[11px]">Min. Relevanz Score</p>
                   <p className="font-semibold text-[#1DB954]">{clamp01(minScore).toFixed(2)}</p>
                 </div>
                 <input
@@ -486,13 +486,13 @@ export default function Page() {
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
-              <span className="inline-flex items-center gap-2 rounded-full bg-zinc-900/70 px-3 py-1 ring-1 ring-zinc-700">
+              <span className="inline-flex items-center gap-2 rounded-full bg-zinc-900/60 px-3 py-1 ring-1 ring-zinc-700/80">
                 <Calendar className="h-4 w-4" /> Aktuelle KW: <strong className="text-zinc-200">KW {currentWeek}</strong>
               </span>
-              <span className="inline-flex items-center rounded-full bg-zinc-900/70 px-3 py-1 ring-1 ring-zinc-700">
+              <span className="inline-flex items-center rounded-full bg-zinc-900/60 px-3 py-1 ring-1 ring-zinc-700/80">
                 Letzte KW: <strong className="ml-1 text-zinc-200">KW {previousWeek}</strong>
               </span>
-              <span className="ml-auto inline-flex items-center gap-2 rounded-full bg-zinc-900/70 px-3 py-1 ring-1 ring-zinc-700">
+              <span className="ml-auto inline-flex items-center gap-2 rounded-full bg-zinc-900/60 px-3 py-1 ring-1 ring-zinc-700/80">
                 <Filter className="h-4 w-4" />
                 <strong className="text-zinc-200">{filtered.length}</strong> Trends
               </span>
@@ -503,31 +503,31 @@ export default function Page() {
 
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-2xl border border-zinc-700/80 bg-zinc-800/50 p-5">
+          <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
             <p className="text-sm text-zinc-400">Aktive Trends</p>
-            <p className="mt-3 text-5xl font-semibold tracking-tight">{kpis.count}</p>
+            <p className="mt-3 text-4xl font-semibold tracking-tight">{kpis.count}</p>
           </div>
-          <div className="rounded-2xl border border-zinc-700/80 bg-zinc-800/50 p-5">
+          <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
             <p className="text-sm text-zinc-400">Durchschn. Score</p>
-            <p className="mt-3 text-5xl font-semibold tracking-tight text-[#1DB954]">
+            <p className="mt-3 text-4xl font-semibold tracking-tight text-[#1DB954]">
               {kpis.avgScore === null ? "—" : clamp01(kpis.avgScore).toFixed(2)}
             </p>
           </div>
-          <div className="rounded-2xl border border-zinc-700/80 bg-zinc-800/50 p-5">
+          <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
             <p className="text-sm text-zinc-400">Top Kategorie</p>
-            <p className="mt-3 text-4xl font-semibold tracking-tight">{kpis.topCategory}</p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight">{kpis.topCategory}</p>
           </div>
-          <div className="relative overflow-hidden rounded-2xl border border-zinc-700/80 bg-zinc-800/50 p-5">
+          <div className="relative overflow-hidden rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
             <p className="text-sm text-zinc-400">High Priority (Score ≥ 0.8)</p>
-            <p className="mt-3 text-5xl font-semibold tracking-tight text-rose-300">{kpis.highPriority}</p>
+            <p className="mt-3 text-4xl font-semibold tracking-tight text-rose-300">{kpis.highPriority}</p>
             <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-rose-400/10 blur-2xl" />
           </div>
         </section>
 
         <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="rounded-2xl border border-zinc-700/80 bg-zinc-800/50 p-5">
+          <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
             <div className="flex items-center justify-between">
-              <p className="text-2xl font-semibold tracking-tight">Verteilung nach Kategorie</p>
+              <p className="text-xl font-semibold tracking-tight">Verteilung nach Kategorie</p>
               <BarChart3 className="h-5 w-5 text-zinc-400" />
             </div>
 
@@ -557,9 +557,9 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-zinc-700/80 bg-zinc-800/50 p-5">
+          <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
             <div className="flex items-center justify-between">
-              <p className="text-2xl font-semibold tracking-tight">Relevanz-Verteilung</p>
+              <p className="text-xl font-semibold tracking-tight">Relevanz-Verteilung</p>
               <Flame className="h-5 w-5 text-zinc-400" />
             </div>
 
@@ -591,17 +591,17 @@ export default function Page() {
 
         <section className="space-y-4">
           {loading ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-zinc-700/80 bg-zinc-800/50 p-6 text-zinc-300">
+            <div className="flex items-center gap-3 rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-6 text-zinc-300">
               <LoaderCircle className="h-5 w-5 animate-spin" />
               <p>Trends werden geladen…</p>
             </div>
           ) : error ? (
-            <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-200">
+            <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-200">
               <p className="font-semibold">Fehler beim Laden</p>
               <p className="mt-1 text-sm opacity-90">{error}</p>
             </div>
           ) : grouped.length === 0 ? (
-            <div className="rounded-2xl border border-zinc-700/80 bg-zinc-800/50 p-6 text-zinc-300">
+            <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-6 text-zinc-300">
               <p className="font-semibold">Keine Trends gefunden</p>
               <p className="mt-1 text-sm text-zinc-500">
                 Prüfe die n8n-Sync oder passe die Filter an.
@@ -611,7 +611,7 @@ export default function Page() {
             grouped.map(({ label, items }) => (
               <div key={label} className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold tracking-tight text-zinc-200">{label}</h2>
+                  <h2 className="text-base font-semibold tracking-tight text-zinc-200">{label}</h2>
                   <p className="text-sm text-zinc-500">{items.length} Trends</p>
                 </div>
 
@@ -634,7 +634,7 @@ export default function Page() {
                     return (
                       <article
                         key={idKey}
-                        className="rounded-2xl border border-zinc-700/80 bg-zinc-800/55 p-4 shadow-sm shadow-black/40"
+                        className="rounded-3xl border border-zinc-700/70 bg-zinc-800/50 p-4 shadow-sm shadow-black/35"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex min-w-0 items-center gap-2">
@@ -660,10 +660,10 @@ export default function Page() {
                           ) : null}
                         </div>
 
-                        <h3 className="mt-3 text-lg font-semibold leading-tight text-zinc-100">{title}</h3>
+                        <h3 className="mt-3 text-base font-semibold leading-tight text-zinc-100">{title}</h3>
 
                         {preview && !isOpen ? (
-                          <p className="mt-2 text-sm leading-6 text-zinc-300">{preview}</p>
+                          <p className="mt-2 text-[13px] leading-5 text-zinc-300">{preview}</p>
                         ) : null}
 
                         <button
