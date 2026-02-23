@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Spotify">
+  <title>Spotify</title>
+  <circle cx="128" cy="128" r="120" fill="#1DB954"/>
+  <path
+    d="M71 111c44-13 92-9 131 9"
+    fill="none"
+    stroke="#0a0a0a"
+    stroke-width="18"
+    stroke-linecap="round"
+    opacity="0.92"
+  />
+  <path
+    d="M77 149c38-11 76-8 108 8"
+    fill="none"
+    stroke="#0a0a0a"
+    stroke-width="16"
+    stroke-linecap="round"
+    opacity="0.88"
+  />
+  <path
+    d="M84 184c28-8 57-6 80 6"
+    fill="none"
+    stroke="#0a0a0a"
+    stroke-width="14"
+    stroke-linecap="round"
+    opacity="0.84"
+  />
+</svg>
+
