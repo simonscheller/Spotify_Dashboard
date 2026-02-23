@@ -1,24 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Spotify Trend Dashboard
 
-## Getting Started
+Next.js App Router Dashboard, das Trends aus Supabase (`trends` Tabelle) lädt und nach Zeitraum/Kategorie/Score filtert.
 
-First, run the development server:
+### Setup
+
+- **Install**
+
+```bash
+npm install
+```
+
+- **Env**: Lege `/.env.local` (wird nicht committed) an:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+```
+
+- **RLS (wichtig)**: Wenn du in Supabase für `public.trends` **RLS aktiviert** hast, brauchst du eine `SELECT`-Policy für `anon`.
+  - Du kannst das SQL aus `sql/supabase_rls_policies.sql` im Supabase **SQL Editor** ausführen.
+
+### Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
 
