@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   Calendar,
@@ -140,59 +140,90 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [trends, setTrends] = useState<Trend[]>([]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
+  const loadTrends = useCallback(async (background = false) => {
+    if (!background) {
       setLoading(true);
-      setError(null);
+    }
+    setError(null);
 
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-      if (!url || !key) {
-        setLoading(false);
-        setError(
-          "Supabase env vars fehlen. Bitte setze NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY."
-        );
-        return;
-      }
-
-      if (!supabase) {
-        setLoading(false);
-        setError(
-          "Supabase Client konnte nicht initialisiert werden. Prüfe NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY."
-        );
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("trends")
-        .select(
-          "id, topic, category, relevance_score, summary, spotify_impact, url, published_date, week_number"
-        )
-        .order("published_date", { ascending: false })
-        .order("relevance_score", { ascending: false })
-        .limit(400);
-
-      if (cancelled) return;
-
-      if (error) {
-        setError(error.message);
-        setTrends([]);
-      } else {
-        setTrends((data ?? []) as Trend[]);
-      }
-
-      setLoading(false);
+    if (!url || !key) {
+      if (!background) setLoading(false);
+      setError(
+        "Supabase env vars fehlen. Bitte setze NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      return;
     }
 
-    void load();
+    if (!supabase) {
+      if (!background) setLoading(false);
+      setError(
+        "Supabase Client konnte nicht initialisiert werden. Prüfe NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("trends")
+      .select(
+        "id, topic, category, relevance_score, summary, spotify_impact, url, published_date, week_number"
+      )
+      .order("published_date", { ascending: false })
+      .order("relevance_score", { ascending: false })
+      .limit(400);
+
+    if (error) {
+      setError(error.message);
+      setTrends([]);
+    } else {
+      setTrends((data ?? []) as Trend[]);
+    }
+
+    if (!background) {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    void loadTrends(false);
+
+    const sb = supabase;
+    if (!sb) return () => {};
+
+    const channel = sb
+      .channel("public:trends-live")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "trends" },
+        () => {
+          if (active) void loadTrends(true);
+        }
+      )
+      .subscribe();
+
+    const pollId = window.setInterval(() => {
+      if (active) void loadTrends(true);
+    }, 30000);
+
+    const onFocus = () => {
+      if (active) void loadTrends(true);
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
 
     return () => {
-      cancelled = true;
+      active = false;
+      window.clearInterval(pollId);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+      void sb.removeChannel(channel);
     };
-  }, []);
+  }, [loadTrends]);
 
   const normalizedTrends = useMemo(() => {
     return trends
