@@ -1,26 +1,111 @@
 @import "tailwindcss";
 
+/* ── Design Tokens (from spotify-pulse) ────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: hsl(220 14% 10%);
+  --foreground: hsl(0 0% 95%);
+
+  --primary: hsl(141 73% 42%);
+  --primary-foreground: hsl(0 0% 0%);
+
+  --secondary: hsl(220 12% 18%);
+  --secondary-foreground: hsl(0 0% 85%);
+
+  --muted: hsl(220 10% 18%);
+  --muted-foreground: hsl(220 10% 55%);
+
+  --border: hsl(220 10% 20%);
+
+  /* Glass morphism */
+  --glass: hsl(220 13% 14%);
+  --glass-border: hsl(220 10% 22%);
+  --glass-hover: hsl(220 12% 17%);
+
+  /* Score tier colours */
+  --score-high: hsl(0 72% 58%);
+  --score-mid: hsl(38 92% 50%);
+  --score-low: hsl(141 73% 42%);
+
+  --radius: 1rem;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-border: var(--border);
+
+  --color-glass: var(--glass);
+  --color-glass-border: var(--glass-border);
+  --color-glass-hover: var(--glass-hover);
+
+  --color-score-high: var(--score-high);
+  --color-score-mid: var(--score-mid);
+  --color-score-low: var(--score-low);
+
+  /* Apple-like system font stack */
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Component classes (mirrored from spotify-pulse) ────────── */
+@layer components {
+  /* Frosted glass card */
+  .glass-card {
+    @apply rounded-2xl border border-glass-border bg-glass backdrop-blur-xl transition-all duration-300;
+  }
+
+  /* Interactive glass card with hover state */
+  .glass-card-hover {
+    @apply rounded-2xl border border-glass-border bg-glass backdrop-blur-xl transition-all duration-300
+      hover:border-primary/20 hover:bg-glass-hover cursor-pointer;
+  }
+
+  /* KPI typography */
+  .kpi-value {
+    @apply text-4xl font-semibold tracking-tight;
+  }
+
+  .kpi-label {
+    @apply text-sm font-medium text-muted-foreground;
+  }
+
+  /* Filter toggle chips */
+  .filter-chip-active {
+    @apply rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 cursor-pointer
+      bg-primary text-primary-foreground;
+  }
+
+  .filter-chip-inactive {
+    @apply rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 cursor-pointer
+      text-secondary-foreground hover:bg-glass-hover;
+  }
+
+  /* Category + score badges */
+  .category-badge {
+    @apply inline-flex items-center rounded-lg px-3 py-1 text-xs font-semibold;
+  }
+
+  .score-badge {
+    @apply inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-bold bg-secondary;
+  }
 }
