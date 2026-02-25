@@ -11,6 +11,7 @@ import {
   Filter,
   Flame,
   LoaderCircle,
+  RefreshCcw,
   Sparkles,
   TrendingUp,
 } from "lucide-react";
@@ -140,10 +141,13 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trends, setTrends] = useState<Trend[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   /* ── Data fetching (unchanged) ───────────────────────────── */
   const loadTrends = useCallback(async (background = false) => {
     if (!background) setLoading(true);
+    if (background) setRefreshing(true);
     setError(null);
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -151,6 +155,7 @@ export default function Page() {
 
     if (!url || !key) {
       if (!background) setLoading(false);
+      if (background) setRefreshing(false);
       setError(
         "Supabase env vars fehlen. Bitte setze NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY."
       );
@@ -159,6 +164,7 @@ export default function Page() {
 
     if (!supabase) {
       if (!background) setLoading(false);
+      if (background) setRefreshing(false);
       setError(
         "Supabase Client konnte nicht initialisiert werden. Prüfe NEXT_PUBLIC_SUPABASE_URL und NEXT_PUBLIC_SUPABASE_ANON_KEY."
       );
@@ -179,9 +185,11 @@ export default function Page() {
       setTrends([]);
     } else {
       setTrends((data ?? []) as Trend[]);
+      setLastUpdated(new Date());
     }
 
     if (!background) setLoading(false);
+    if (background) setRefreshing(false);
   }, []);
 
   useEffect(() => {
@@ -494,6 +502,19 @@ export default function Page() {
               <Filter className="h-4 w-4" />
               <strong className="text-foreground">{filtered.length}</strong>&nbsp;Trends
             </span>
+            <button
+              type="button"
+              onClick={() => void loadTrends(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-secondary px-4 py-2 text-sm text-muted-foreground transition hover:bg-glass-hover"
+            >
+              <RefreshCcw className={cx("h-4 w-4", refreshing && "animate-spin")} />
+              Aktualisieren
+            </button>
+            {lastUpdated ? (
+              <span className="text-xs text-muted-foreground">
+                Zuletzt aktualisiert: {lastUpdated.toLocaleTimeString("de-DE")}
+              </span>
+            ) : null}
           </div>
         </div>
 

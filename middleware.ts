@@ -1,29 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(req: NextRequest) {
-  const user = process.env.BASIC_AUTH_USER;
-  const pass = process.env.BASIC_AUTH_PASS;
+  const token = process.env.BASIC_AUTH_TOKEN;
+  // If not configured, protection stays disabled.
+  if (!token) return NextResponse.next();
 
-  // Wenn nicht gesetzt: Schutz aus
-  if (!user || !pass) return NextResponse.next();
+  const pathname = req.nextUrl.pathname;
+  const isPublicPath =
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth/login") ||
+    pathname.startsWith("/_next/static") ||
+    pathname.startsWith("/_next/image") ||
+    pathname === "/favicon.ico";
+  if (isPublicPath) return NextResponse.next();
 
-  const authHeader = req.headers.get("authorization");
-  if (authHeader) {
-    const [scheme, encoded] = authHeader.split(" ");
-    if (scheme === "Basic" && encoded) {
-      const decoded = atob(encoded);
-      const [u, p] = decoded.split(":");
-      if (u === user && p === pass) return NextResponse.next();
-    }
+  const authCookie = req.cookies.get("site_auth")?.value;
+  if (authCookie === token) {
+    return NextResponse.next();
   }
 
-  return new NextResponse("Auth required", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Secure Area"' },
-  });
+  const loginUrl = req.nextUrl.clone();
+  loginUrl.pathname = "/login";
+  loginUrl.searchParams.set("next", req.nextUrl.pathname);
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/:path*"],
 };
 

@@ -15,7 +15,12 @@ npm install
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+BASIC_AUTH_USER=<user>
+BASIC_AUTH_PASS=<passwort>
+BASIC_AUTH_TOKEN=<random-langer-token>
 ```
+
+- **Login-Schutz**: `BASIC_AUTH_TOKEN` ist verpflichtend fuer die custom Login-Seite (`/login` + Cookie-Session).
 
 - **RLS (wichtig)**: Wenn du in Supabase für `public.trends` **RLS aktiviert** hast, brauchst du eine `SELECT`-Policy für `anon`.
   - Du kannst das SQL aus `sql/supabase_rls_policies.sql` im Supabase **SQL Editor** ausführen.
