@@ -29,6 +29,9 @@ type Trend = {
   url: string | null;
   published_date: string | null;
   week_number: number | null;
+  source_page?: string | null;
+  page?: string | null;
+  page_number?: string | number | null;
 };
 
 type GroupBy = "week" | "day" | "month";
@@ -126,6 +129,22 @@ function compactText(text: string, len: number) {
   const cleaned = text.trim();
   if (cleaned.length <= len) return cleaned;
   return `${cleaned.slice(0, len).trimEnd()}\u2026`;
+}
+
+function inferPageReference(t: Trend) {
+  const direct = [t.source_page, t.page, t.page_number]
+    .map((v) => (v ?? "").toString().trim())
+    .find(Boolean);
+  if (direct) return direct.startsWith("S.") ? direct : `S. ${direct.replace(/^S\.?\s*/i, "")}`;
+
+  const text = [t.summary, t.topic, t.url].filter(Boolean).join(" ");
+  const fromText = text.match(/\bS\.?\s*(\d{1,3})\b/i) ?? text.match(/\bSeite\s*(\d{1,3})\b/i);
+  if (fromText?.[1]) return `S. ${fromText[1]}`;
+
+  const fromUrl = (t.url ?? "").match(/[?&](?:page|p|seite)=(\d{1,3})/i);
+  if (fromUrl?.[1]) return `S. ${fromUrl[1]}`;
+
+  return "S. -";
 }
 
 /* ── Page component ──────────────────────────────────────────── */
@@ -234,7 +253,7 @@ export default function Page() {
 
   /* ── Data transformation (unchanged) ────────────────────── */
   const normalizedTrends = useMemo(() => {
-    return trends
+    const cleaned = trends
       .map((t) => {
         const d = safeDate(t.published_date);
         return { ...t, week_number: t.week_number ?? (d ? getISOWeek(d) : null) };
@@ -250,6 +269,15 @@ export default function Page() {
         const hasWeek = typeof t.week_number === "number" && t.week_number > 0;
         return hasTopic || hasSummary || hasImpact || hasUrl || hasScore || hasCategory || hasDate || hasWeek;
       });
+    const seenSummaries = new Set<string>();
+    return cleaned.filter((t) => {
+      const summary = (t.summary ?? "").trim();
+      // If the summary text is exactly identical, keep only one record.
+      if (!summary) return true;
+      if (seenSummaries.has(summary)) return false;
+      seenSummaries.add(summary);
+      return true;
+    });
   }, [trends]);
 
   const categories = useMemo(() => {
@@ -461,7 +489,7 @@ export default function Page() {
         r.getCell(4).value = relevance || "";
         r.getCell(5).value = summary || "";
         r.getCell(6).value = "TRENDONE 02/2026";
-        r.getCell(7).value = "S. -";
+        r.getCell(7).value = inferPageReference(t);
 
         r.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightGreen } };
         r.getCell(1).numFmt = "0.00";
