@@ -7,6 +7,7 @@ import {
   BarChart3,
   Calendar,
   ChevronDown,
+  Download,
   ExternalLink,
   Filter,
   Flame,
@@ -31,6 +32,7 @@ type Trend = {
 };
 
 type GroupBy = "week" | "day" | "month";
+type ExportScope = "all" | "month" | "week";
 
 /* ── Utility functions (data logic — unchanged) ──────────────── */
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -143,6 +145,10 @@ export default function Page() {
   const [trends, setTrends] = useState<Trend[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [exportScope, setExportScope] = useState<ExportScope>("all");
+  const [exportMonth, setExportMonth] = useState<string>("all");
+  const [exportWeek, setExportWeek] = useState<string>("all");
+  const [exporting, setExporting] = useState(false);
 
   /* ── Data fetching (unchanged) ───────────────────────────── */
   const loadTrends = useCallback(async (background = false) => {
@@ -269,6 +275,23 @@ export default function Page() {
     return keys.map((key) => ({ key, label: slotLabelFromKey(key, groupBy) }));
   }, [groupBy, normalizedTrends]);
 
+  const exportMonths = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of normalizedTrends) {
+      const d = safeDate(t.published_date);
+      if (d) set.add(monthKey(d));
+    }
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [normalizedTrends]);
+
+  const exportWeeks = useMemo(() => {
+    const set = new Set<number>();
+    for (const t of normalizedTrends) {
+      if (typeof t.week_number === "number" && t.week_number > 0) set.add(t.week_number);
+    }
+    return Array.from(set).sort((a, b) => b - a);
+  }, [normalizedTrends]);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedSlot("all");
@@ -284,6 +307,20 @@ export default function Page() {
       return true;
     });
   }, [groupBy, minScore, normalizedTrends, selectedCategory, selectedSlot]);
+
+  const exportData = useMemo(() => {
+    let rows = normalizedTrends;
+    if (exportScope === "month" && exportMonth !== "all") {
+      rows = rows.filter((t) => {
+        const d = safeDate(t.published_date);
+        return d ? monthKey(d) === exportMonth : false;
+      });
+    }
+    if (exportScope === "week" && exportWeek !== "all") {
+      rows = rows.filter((t) => String(t.week_number ?? "") === exportWeek);
+    }
+    return rows;
+  }, [exportMonth, exportScope, exportWeek, normalizedTrends]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Trend[]>();
@@ -352,6 +389,125 @@ export default function Page() {
     const key = String(id);
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+
+  const handleExcelExport = useCallback(async () => {
+    if (exportData.length === 0 || exporting) return;
+    setExporting(true);
+
+    try {
+      const ExcelJS = await import("exceljs");
+      const workbook = new ExcelJS.Workbook();
+      const ws = workbook.addWorksheet("Spotify Trends");
+
+      ws.columns = [
+        { key: "score", width: 8 },
+        { key: "category", width: 22 },
+        { key: "topic", width: 50 },
+        { key: "relevance", width: 35 },
+        { key: "summary", width: 75 },
+        { key: "source", width: 20 },
+        { key: "page", width: 12 },
+      ];
+
+      ws.mergeCells("A1:G1");
+      ws.mergeCells("A2:G2");
+      ws.getCell("A1").value = "SPOTIFY TRENDONE-ANALYSE";
+      ws.getCell("A2").value =
+        "Quelle: TRENDONE Executive Trendreport 02/2026 | Zeitraum: Februar 2026";
+
+      ws.getRow(1).height = 25;
+      ws.getRow(2).height = 20;
+      ws.getRow(3).height = 15;
+      ws.getRow(4).height = 30;
+
+      const darkHeader = "FF191414";
+      const spotifyGreen = "FF1DB954";
+      const white = "FFFFFFFF";
+      const lightGreen = "FFC8E6C9";
+      const black = "FF000000";
+
+      for (const rowN of [1, 2]) {
+        const row = ws.getRow(rowN);
+        for (let c = 1; c <= 7; c += 1) {
+          const cell = row.getCell(c);
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: darkHeader } };
+          cell.font = { color: { argb: white }, bold: rowN === 1, size: rowN === 1 ? 14 : 10 };
+          cell.alignment = { vertical: "middle", horizontal: rowN === 1 ? "center" : "left" };
+        }
+      }
+
+      const headers = ["Score", "Kategorie", "Topic", "Spotify-Relevanz", "Zusammenfassung", "Quelle", "Seite"];
+      const headerRow = ws.getRow(4);
+      headers.forEach((h, i) => {
+        const cell = headerRow.getCell(i + 1);
+        cell.value = h;
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: spotifyGreen } };
+        cell.font = { color: { argb: white }, bold: true, size: 11 };
+        cell.alignment = { vertical: "middle", horizontal: "left" };
+      });
+
+      exportData.forEach((t, idx) => {
+        const r = ws.getRow(5 + idx);
+        r.height = 65;
+        const score = typeof t.relevance_score === "number" ? Number(clamp01(t.relevance_score).toFixed(2)) : null;
+        const category = (t.category ?? "").trim();
+        const topic = (t.topic ?? "").trim().toUpperCase();
+        const relevance = (t.spotify_impact ?? "").trim();
+        const summary = (t.summary ?? "").trim();
+
+        r.getCell(1).value = score;
+        r.getCell(2).value = category || "";
+        r.getCell(3).value = topic || "";
+        r.getCell(4).value = relevance || "";
+        r.getCell(5).value = summary || "";
+        r.getCell(6).value = "TRENDONE 02/2026";
+        r.getCell(7).value = "S. -";
+
+        r.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightGreen } };
+        r.getCell(1).numFmt = "0.00";
+        r.getCell(1).alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+
+        for (let c = 2; c <= 7; c += 1) {
+          const cell = r.getCell(c);
+          cell.font = { color: { argb: black }, size: 10 };
+          cell.alignment = { vertical: "top", horizontal: "left", wrapText: true };
+        }
+      });
+
+      const maxRow = Math.max(4, 4 + exportData.length);
+      for (let r = 4; r <= maxRow; r += 1) {
+        for (let c = 1; c <= 7; c += 1) {
+          ws.getCell(r, c).border = {
+            top: { style: "thin", color: { argb: "FFD9D9D9" } },
+            bottom: { style: "thin", color: { argb: "FFD9D9D9" } },
+            left: { style: "thin", color: { argb: "FFD9D9D9" } },
+            right: { style: "thin", color: { argb: "FFD9D9D9" } },
+          };
+        }
+      }
+
+      const scopePart =
+        exportScope === "all"
+          ? "alles"
+          : exportScope === "month"
+            ? `monat-${exportMonth === "all" ? "alle" : exportMonth}`
+            : `kw-${exportWeek === "all" ? "alle" : exportWeek}`;
+      const filename = `Spotify_TRENDONE_Analyse_${scopePart}.xlsx`;
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  }, [exportData, exportMonth, exportScope, exportWeek, exporting]);
 
   /* ── Render ──────────────────────────────────────────────── */
   return (
@@ -515,6 +671,82 @@ export default function Page() {
                 Zuletzt aktualisiert: {lastUpdated.toLocaleTimeString("de-DE")}
               </span>
             ) : null}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl bg-secondary/40 p-3">
+            <div className="space-y-1">
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Export
+              </span>
+              <div className="relative">
+                <select
+                  value={exportScope}
+                  onChange={(e) => setExportScope(e.target.value as ExportScope)}
+                  className="h-10 min-w-[120px] cursor-pointer appearance-none rounded-xl bg-secondary px-3 pr-9 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                >
+                  <option value="all">Alles</option>
+                  <option value="month">Nach Monat</option>
+                  <option value="week">Nach KW</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              </div>
+            </div>
+
+            {exportScope === "month" ? (
+              <div className="space-y-1">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Monat
+                </span>
+                <div className="relative">
+                  <select
+                    value={exportMonth}
+                    onChange={(e) => setExportMonth(e.target.value)}
+                    className="h-10 min-w-[150px] cursor-pointer appearance-none rounded-xl bg-secondary px-3 pr-9 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="all">Alle Monate</option>
+                    {exportMonths.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                </div>
+              </div>
+            ) : null}
+
+            {exportScope === "week" ? (
+              <div className="space-y-1">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Kalenderwoche
+                </span>
+                <div className="relative">
+                  <select
+                    value={exportWeek}
+                    onChange={(e) => setExportWeek(e.target.value)}
+                    className="h-10 min-w-[120px] cursor-pointer appearance-none rounded-xl bg-secondary px-3 pr-9 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                  >
+                    <option value="all">Alle KWs</option>
+                    {exportWeeks.map((w) => (
+                      <option key={w} value={String(w)}>
+                        KW {w}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                </div>
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              onClick={() => void handleExcelExport()}
+              disabled={exporting || exportData.length === 0}
+              className="ml-auto inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download className="h-4 w-4" />
+              {exporting ? "Exportiert..." : "Excel Export"}
+            </button>
           </div>
         </div>
 
