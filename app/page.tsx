@@ -605,7 +605,7 @@ export default function Page() {
                 <select
                   value={selectedSlot}
                   onChange={(e) => setSelectedSlot(e.target.value)}
-                  className="h-11 min-w-[180px] cursor-pointer appearance-none rounded-xl bg-secondary px-4 pr-10 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                  className="h-11 min-w-[200px] cursor-pointer appearance-none rounded-xl border border-glass-border bg-secondary px-4 pr-10 text-sm text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
                 >
                   <option value="all">
                     {groupBy === "week"
@@ -633,7 +633,7 @@ export default function Page() {
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="h-11 min-w-[200px] cursor-pointer appearance-none rounded-xl bg-secondary px-4 pr-10 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                  className="h-11 min-w-[220px] cursor-pointer appearance-none rounded-xl border border-glass-border bg-secondary px-4 pr-10 text-sm text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
                 >
                   <option value="all">Alle Kategorien</option>
                   {categories.map((c) => (
@@ -701,16 +701,54 @@ export default function Page() {
             ) : null}
           </div>
 
-          <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl bg-secondary/40 p-3">
-            <div className="space-y-1">
+          {groupBy === "week" && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl bg-secondary/35 p-3">
               <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Export
+                Schnellfilter KW
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedSlot("all")}
+                className={cx(
+                  "rounded-lg px-3 py-1.5 text-xs font-medium transition",
+                  selectedSlot === "all"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-secondary-foreground hover:bg-glass-hover"
+                )}
+              >
+                Alle Wochen
+              </button>
+              {exportWeeks.slice(0, 12).map((w) => {
+                const key = `week:${w}`;
+                return (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => setSelectedSlot(key)}
+                    className={cx(
+                      "rounded-lg px-3 py-1.5 text-xs font-medium transition",
+                      selectedSlot === key
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground hover:bg-glass-hover"
+                    )}
+                  >
+                    KW {w}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-primary/25 bg-secondary/40 p-3">
+            <div className="space-y-1">
+              <span className="text-xs font-medium uppercase tracking-wider text-primary">
+                Excel Export
               </span>
               <div className="relative">
                 <select
                   value={exportScope}
                   onChange={(e) => setExportScope(e.target.value as ExportScope)}
-                  className="h-10 min-w-[120px] cursor-pointer appearance-none rounded-xl bg-secondary px-3 pr-9 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                  className="h-10 min-w-[140px] cursor-pointer appearance-none rounded-xl border border-glass-border bg-secondary px-3 pr-9 text-sm text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
                 >
                   <option value="all">Alles</option>
                   <option value="month">Nach Monat</option>
@@ -729,7 +767,7 @@ export default function Page() {
                   <select
                     value={exportMonth}
                     onChange={(e) => setExportMonth(e.target.value)}
-                    className="h-10 min-w-[150px] cursor-pointer appearance-none rounded-xl bg-secondary px-3 pr-9 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                    className="h-10 min-w-[160px] cursor-pointer appearance-none rounded-xl border border-glass-border bg-secondary px-3 pr-9 text-sm text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
                   >
                     <option value="all">Alle Monate</option>
                     {exportMonths.map((m) => (
@@ -752,7 +790,7 @@ export default function Page() {
                   <select
                     value={exportWeek}
                     onChange={(e) => setExportWeek(e.target.value)}
-                    className="h-10 min-w-[120px] cursor-pointer appearance-none rounded-xl bg-secondary px-3 pr-9 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                    className="h-10 min-w-[130px] cursor-pointer appearance-none rounded-xl border border-glass-border bg-secondary px-3 pr-9 text-sm text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
                   >
                     <option value="all">Alle KWs</option>
                     {exportWeeks.map((w) => (
@@ -773,7 +811,7 @@ export default function Page() {
               className="ml-auto inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Download className="h-4 w-4" />
-              {exporting ? "Exportiert..." : "Excel Export"}
+              {exporting ? "Exportiere..." : "Excel exportieren"}
             </button>
           </div>
         </div>
@@ -977,6 +1015,23 @@ export default function Page() {
                           </p>
                         ) : null}
 
+                        {/* Source (always visible) */}
+                        <div className="mt-3">
+                          {url ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                            >
+                              Quelle öffnen <ExternalLink className="h-4 w-4" />
+                            </a>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">Quelle: TRENDONE 02/2026</p>
+                          )}
+                        </div>
+
                         {/* Expand toggle */}
                         <div className="mt-3 flex items-center gap-1 text-sm font-medium text-primary">
                           <span>{isOpen ? "Weniger anzeigen" : "Details anzeigen"}</span>
@@ -1004,17 +1059,7 @@ export default function Page() {
                                 <p className="mt-1 font-semibold text-primary">{impact}</p>
                               </div>
                             ) : null}
-                            {url ? (
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center justify-center gap-1 rounded-xl border border-glass-border bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-glass-hover"
-                              >
-                                Quelle öffnen <ExternalLink className="h-4 w-4" />
-                              </a>
-                            ) : null}
+                            {/* Source link is shown in collapsed + expanded state above */}
                           </div>
                         ) : null}
                       </article>
