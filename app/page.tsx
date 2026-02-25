@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
+  Award,
   BarChart3,
   Calendar,
   ChevronDown,
@@ -9,12 +11,12 @@ import {
   Filter,
   Flame,
   LoaderCircle,
-  Minus,
-  Plus,
   Sparkles,
+  TrendingUp,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 
+/* ── Types ───────────────────────────────────────────────────── */
 type Trend = {
   id: number | string;
   topic: string | null;
@@ -29,6 +31,7 @@ type Trend = {
 
 type GroupBy = "week" | "day" | "month";
 
+/* ── Utility functions (data logic — unchanged) ──────────────── */
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
@@ -69,28 +72,27 @@ function formatScore(score: number | null) {
   return clamp01(score).toFixed(2);
 }
 
+/** Maps score to design-token colour classes (aligned with spotify-pulse) */
 function scoreColor(score: number | null) {
-  if (score === null || Number.isNaN(score)) return "text-zinc-400";
+  if (score === null || Number.isNaN(score)) return "text-muted-foreground";
   const s = clamp01(score);
-  if (s >= 0.8) return "text-rose-300";
-  if (s >= 0.6) return "text-emerald-300";
-  if (s >= 0.4) return "text-amber-300";
-  return "text-zinc-300";
+  if (s >= 0.8) return "text-score-high";
+  if (s >= 0.6) return "text-score-mid";
+  return "text-score-low";
 }
 
+/** Category badge colour classes */
 function categoryStyles(category: string) {
   const key = category.toLowerCase();
-  if (key.includes("spotify")) return "bg-[#1DB954]/20 text-[#35e06f] ring-[#1DB954]/40";
-  if (key.includes("wettbewerb") || key.includes("competition")) {
-    return "bg-rose-500/20 text-rose-300 ring-rose-500/40";
-  }
-  if (key.includes("marketing") || key.includes("markt")) {
+  if (key.includes("spotify"))
+    return "bg-[#1DB954]/20 text-[#35e06f] ring-[#1DB954]/40";
+  if (key.includes("wettbewerb") || key.includes("competition"))
+    return "bg-score-high/20 text-score-high ring-score-high/40";
+  if (key.includes("marketing") || key.includes("markt"))
     return "bg-sky-500/20 text-sky-300 ring-sky-500/40";
-  }
-  if (key.includes("audio") || key.includes("podcast")) {
+  if (key.includes("audio") || key.includes("podcast"))
     return "bg-violet-500/20 text-violet-300 ring-violet-500/40";
-  }
-  return "bg-zinc-500/20 text-zinc-300 ring-zinc-500/40";
+  return "bg-secondary text-secondary-foreground ring-glass-border";
 }
 
 function slotKeyForTrend(t: Trend, groupBy: GroupBy) {
@@ -106,14 +108,12 @@ function slotLabelFromKey(key: string, groupBy: GroupBy) {
     if (groupBy === "day") return "Ohne Datum";
     return "Ohne Monat";
   }
-
   const raw = key.split(":")[1] ?? "";
   if (groupBy === "week") return `KW ${raw}`;
   if (groupBy === "day") {
     const d = safeDate(raw);
     return d ? d.toLocaleDateString("de-DE") : raw;
   }
-
   const [y, m] = raw.split("-");
   const d = new Date(Number(y), Number(m) - 1, 1);
   return d.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
@@ -122,9 +122,10 @@ function slotLabelFromKey(key: string, groupBy: GroupBy) {
 function compactText(text: string, len: number) {
   const cleaned = text.trim();
   if (cleaned.length <= len) return cleaned;
-  return `${cleaned.slice(0, len).trimEnd()}…`;
+  return `${cleaned.slice(0, len).trimEnd()}\u2026`;
 }
 
+/* ── Page component ──────────────────────────────────────────── */
 export default function Page() {
   const now = useMemo(() => new Date(), []);
   const currentWeek = useMemo(() => getISOWeek(now), [now]);
@@ -140,10 +141,9 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [trends, setTrends] = useState<Trend[]>([]);
 
+  /* ── Data fetching (unchanged) ───────────────────────────── */
   const loadTrends = useCallback(async (background = false) => {
-    if (!background) {
-      setLoading(true);
-    }
+    if (!background) setLoading(true);
     setError(null);
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -181,14 +181,12 @@ export default function Page() {
       setTrends((data ?? []) as Trend[]);
     }
 
-    if (!background) {
-      setLoading(false);
-    }
+    if (!background) setLoading(false);
   }, []);
 
   useEffect(() => {
     let active = true;
-
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadTrends(false);
 
     const sb = supabase;
@@ -196,13 +194,9 @@ export default function Page() {
 
     const channel = sb
       .channel("public:trends-live")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "trends" },
-        () => {
-          if (active) void loadTrends(true);
-        }
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "trends" }, () => {
+        if (active) void loadTrends(true);
+      })
       .subscribe();
 
     const pollId = window.setInterval(() => {
@@ -212,7 +206,6 @@ export default function Page() {
     const onFocus = () => {
       if (active) void loadTrends(true);
     };
-
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);
 
@@ -225,14 +218,12 @@ export default function Page() {
     };
   }, [loadTrends]);
 
+  /* ── Data transformation (unchanged) ────────────────────── */
   const normalizedTrends = useMemo(() => {
     return trends
       .map((t) => {
         const d = safeDate(t.published_date);
-        return {
-          ...t,
-          week_number: t.week_number ?? (d ? getISOWeek(d) : null),
-        };
+        return { ...t, week_number: t.week_number ?? (d ? getISOWeek(d) : null) };
       })
       .filter((t) => {
         const hasTopic = Boolean((t.topic ?? "").trim());
@@ -243,17 +234,7 @@ export default function Page() {
         const hasCategory = Boolean((t.category ?? "").trim());
         const hasDate = Boolean((t.published_date ?? "").trim());
         const hasWeek = typeof t.week_number === "number" && t.week_number > 0;
-
-        return (
-          hasTopic ||
-          hasSummary ||
-          hasImpact ||
-          hasUrl ||
-          hasScore ||
-          hasCategory ||
-          hasDate ||
-          hasWeek
-        );
+        return hasTopic || hasSummary || hasImpact || hasUrl || hasScore || hasCategory || hasDate || hasWeek;
       });
   }, [trends]);
 
@@ -267,78 +248,53 @@ export default function Page() {
 
   const slotOptions = useMemo(() => {
     const set = new Set<string>();
-    for (const t of normalizedTrends) {
-      set.add(slotKeyForTrend(t, groupBy));
-    }
+    for (const t of normalizedTrends) set.add(slotKeyForTrend(t, groupBy));
     const keys = Array.from(set);
-
     keys.sort((a, b) => {
       if (a.endsWith(":unknown") && !b.endsWith(":unknown")) return 1;
       if (!a.endsWith(":unknown") && b.endsWith(":unknown")) return -1;
-
       const av = a.split(":")[1] ?? "";
       const bv = b.split(":")[1] ?? "";
-
       if (groupBy === "week") return Number(bv) - Number(av);
       return bv.localeCompare(av);
     });
-
     return keys.map((key) => ({ key, label: slotLabelFromKey(key, groupBy) }));
   }, [groupBy, normalizedTrends]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedSlot("all");
   }, [groupBy]);
 
   const filtered = useMemo(() => {
     const min = clamp01(minScore);
-
     return normalizedTrends.filter((t) => {
-      const score = t.relevance_score ?? 0;
-      if (score < min) return false;
-
+      if ((t.relevance_score ?? 0) < min) return false;
       const category = (t.category ?? "").trim();
       if (selectedCategory !== "all" && category !== selectedCategory) return false;
-
-      if (selectedSlot !== "all") {
-        const key = slotKeyForTrend(t, groupBy);
-        if (key !== selectedSlot) return false;
-      }
-
+      if (selectedSlot !== "all" && slotKeyForTrend(t, groupBy) !== selectedSlot) return false;
       return true;
     });
   }, [groupBy, minScore, normalizedTrends, selectedCategory, selectedSlot]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Trend[]>();
-
     for (const t of filtered) {
-      const key = slotKeyForTrend(t, groupBy);
-      const label = slotLabelFromKey(key, groupBy);
+      const label = slotLabelFromKey(slotKeyForTrend(t, groupBy), groupBy);
       if (!map.has(label)) map.set(label, []);
       map.get(label)!.push(t);
     }
-
     const labels = Array.from(map.keys());
     labels.sort((a, b) => {
-      const aUnknown = a.startsWith("Ohne");
-      const bUnknown = b.startsWith("Ohne");
-      if (aUnknown && !bUnknown) return 1;
-      if (!aUnknown && bUnknown) return -1;
-
+      const aU = a.startsWith("Ohne"), bU = b.startsWith("Ohne");
+      if (aU && !bU) return 1;
+      if (!aU && bU) return -1;
       if (groupBy === "week") {
-        const an = Number(a.replace(/\D/g, "")) || 0;
-        const bn = Number(b.replace(/\D/g, "")) || 0;
-        return bn - an;
+        return (Number(b.replace(/\D/g, "")) || 0) - (Number(a.replace(/\D/g, "")) || 0);
       }
-
       return b.localeCompare(a, "de-DE");
     });
-
-    return labels.map((label) => ({
-      label,
-      items: map.get(label) ?? [],
-    }));
+    return labels.map((label) => ({ label, items: map.get(label) ?? [] }));
   }, [filtered, groupBy]);
 
   const kpis = useMemo(() => {
@@ -346,40 +302,25 @@ export default function Page() {
     const scores = filtered
       .map((t) => t.relevance_score)
       .filter((v): v is number => typeof v === "number");
-
     const avgScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
     const highPriority = filtered.filter((t) => (t.relevance_score ?? 0) >= 0.8).length;
-
     const categoryCount = new Map<string, number>();
     for (const t of filtered) {
       const cat = (t.category ?? "").trim() || "Unkategorisiert";
       categoryCount.set(cat, (categoryCount.get(cat) ?? 0) + 1);
     }
-
     const topCategory =
-      Array.from(categoryCount.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
-
+      Array.from(categoryCount.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "\u2014";
     const distHigh = filtered.filter((t) => (t.relevance_score ?? 0) >= 0.8).length;
     const distMid = filtered.filter(
       (t) => (t.relevance_score ?? 0) >= 0.6 && (t.relevance_score ?? 0) < 0.8
     ).length;
     const distLow = filtered.filter((t) => (t.relevance_score ?? 0) < 0.6).length;
-
     const bars = Array.from(categoryCount.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
       .map(([name, value]) => ({ name, value }));
-
-    return {
-      count,
-      avgScore,
-      topCategory,
-      highPriority,
-      distHigh,
-      distMid,
-      distLow,
-      bars,
-    };
+    return { count, avgScore, topCategory, highPriority, distHigh, distMid, distLow, bars };
   }, [filtered]);
 
   const donutStyle = useMemo(() => {
@@ -387,14 +328,13 @@ export default function Page() {
     const highPct = (kpis.distHigh / total) * 100;
     const midPct = (kpis.distMid / total) * 100;
     const lowPct = (kpis.distLow / total) * 100;
-
     return {
       total: kpis.distHigh + kpis.distMid + kpis.distLow,
       style: {
         background: `conic-gradient(
-          rgba(248,113,113,0.95) 0% ${highPct}%,
-          rgba(52,211,153,0.95) ${highPct}% ${highPct + midPct}%,
-          rgba(148,163,184,0.9) ${highPct + midPct}% ${highPct + midPct + lowPct}%
+          hsl(0 72% 58%) 0% ${highPct}%,
+          hsl(38 92% 50%) ${highPct}% ${highPct + midPct}%,
+          hsl(141 73% 42%) ${highPct + midPct}% ${highPct + midPct + lowPct}%
         )`,
       } as React.CSSProperties,
     };
@@ -405,182 +345,229 @@ export default function Page() {
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  /* ── Render ──────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-[#13151a] text-zinc-100">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_0%,rgba(29,185,84,0.14),rgba(0,0,0,0))]" />
+    <div className="min-h-screen bg-background p-6 lg:p-10">
+      {/* Ambient Spotify-green radial gradient */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_0%,rgba(29,185,84,0.14),rgba(0,0,0,0))]" />
 
-      <header className="border-b border-zinc-800/80 bg-zinc-900/75 backdrop-blur">
-        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-2xl bg-zinc-800/80 p-2 ring-1 ring-zinc-700/70">
-                <img src="/spotify-wordmark.svg" alt="Spotify" className="h-8 w-auto sm:h-9" draggable={false} />
-              </div>
-              <div>
-                <p className="text-xs text-zinc-400">Spotify</p>
-                <h1 className="text-[1.7rem] font-semibold tracking-tight sm:text-[1.9rem]">Trend Radar</h1>
-              </div>
+      <div className="mx-auto max-w-7xl space-y-6">
+
+        {/* ── Header ─────────────────────────────────────────── */}
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary">
+              <svg viewBox="0 0 24 24" className="h-7 w-7 text-primary-foreground" fill="currentColor">
+                <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
+              </svg>
             </div>
-
-            <div className="hidden items-center gap-2 rounded-full bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 ring-1 ring-zinc-700 sm:flex">
-              <Sparkles className="h-3.5 w-3.5 text-[#1DB954]" />
-              Fresh Insights
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Spotify
+              </p>
+              <h1 className="text-2xl font-bold tracking-tight">Trend Radar</h1>
             </div>
           </div>
 
-          <div className="mt-5 rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-4 sm:p-5">
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[auto_auto_1fr_1fr] lg:items-end">
-              <div className="space-y-2">
-                <p className="text-[11px] text-zinc-400">Zeitraum</p>
-                <div className="flex items-center gap-1 rounded-2xl border border-zinc-700 bg-zinc-900/65 p-1">
-                  {([
+          <div className="hidden items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs text-secondary-foreground ring-1 ring-glass-border sm:flex">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            Fresh Insights
+          </div>
+        </header>
+
+        {/* ── Filter Bar ─────────────────────────────────────── */}
+        <div className="glass-card p-5">
+          <div className="flex flex-wrap items-end gap-6">
+
+            {/* Time range toggle */}
+            <div className="space-y-1.5">
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Zeitraum
+              </span>
+              <div className="flex gap-1 rounded-xl bg-secondary p-1">
+                {(
+                  [
                     ["week", "KW"],
                     ["day", "Tag"],
                     ["month", "Monat"],
-                  ] as const).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setGroupBy(value)}
-                      className={cx(
-                        "rounded-xl px-4 py-2 text-sm font-medium transition",
-                        groupBy === value
-                          ? "bg-zinc-200 text-zinc-900"
-                          : "text-zinc-300 hover:bg-zinc-800"
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-[11px] text-zinc-400">Auswahl</p>
-                <div className="relative">
-                  <select
-                    value={selectedSlot}
-                    onChange={(e) => setSelectedSlot(e.target.value)}
-                    className="h-11 min-w-[180px] appearance-none rounded-2xl border border-zinc-700 bg-zinc-900/65 px-3 pr-10 text-sm text-zinc-100 outline-none focus:border-[#1DB954]/60"
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setGroupBy(value)}
+                    className={groupBy === value ? "filter-chip-active" : "filter-chip-inactive"}
                   >
-                    <option value="all">
-                      {groupBy === "week"
-                        ? "Alle Wochen"
-                        : groupBy === "day"
-                          ? "Alle Tage"
-                          : "Alle Monate"}
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Slot select */}
+            <div className="space-y-1.5">
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Auswahl
+              </span>
+              <div className="relative">
+                <select
+                  value={selectedSlot}
+                  onChange={(e) => setSelectedSlot(e.target.value)}
+                  className="h-11 min-w-[180px] cursor-pointer appearance-none rounded-xl bg-secondary px-4 pr-10 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                >
+                  <option value="all">
+                    {groupBy === "week"
+                      ? "Alle Wochen"
+                      : groupBy === "day"
+                        ? "Alle Tage"
+                        : "Alle Monate"}
+                  </option>
+                  {slotOptions.map((slot) => (
+                    <option key={slot.key} value={slot.key}>
+                      {slot.label}
                     </option>
-                    {slotOptions.map((slot) => (
-                      <option key={slot.key} value={slot.key}>
-                        {slot.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-[11px] text-zinc-400">Kategorie Filter</p>
-                <div className="relative">
-                  <select
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="h-11 w-full appearance-none rounded-2xl border border-zinc-700 bg-zinc-900/65 px-3 pr-10 text-sm text-zinc-100 outline-none focus:border-[#1DB954]/60"
-                  >
-                    <option value="all">Alle Kategorien</option>
-                    {categories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <p className="text-zinc-400 text-[11px]">Min. Relevanz Score</p>
-                  <p className="font-semibold text-[#1DB954]">{clamp01(minScore).toFixed(2)}</p>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={minScore}
-                  onChange={(e) => setMinScore(Number(e.target.value))}
-                  className="w-full accent-[#1DB954]"
-                />
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
-              <span className="inline-flex items-center gap-2 rounded-full bg-zinc-900/60 px-3 py-1 ring-1 ring-zinc-700/80">
-                <Calendar className="h-4 w-4" /> Aktuelle KW: <strong className="text-zinc-200">KW {currentWeek}</strong>
+            {/* Category filter */}
+            <div className="space-y-1.5">
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Kategorie
               </span>
-              <span className="inline-flex items-center rounded-full bg-zinc-900/60 px-3 py-1 ring-1 ring-zinc-700/80">
-                Letzte KW: <strong className="ml-1 text-zinc-200">KW {previousWeek}</strong>
-              </span>
-              <span className="ml-auto inline-flex items-center gap-2 rounded-full bg-zinc-900/60 px-3 py-1 ring-1 ring-zinc-700/80">
-                <Filter className="h-4 w-4" />
-                <strong className="text-zinc-200">{filtered.length}</strong> Trends
-              </span>
+              <div className="relative">
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="h-11 min-w-[200px] cursor-pointer appearance-none rounded-xl bg-secondary px-4 pr-10 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                >
+                  <option value="all">Alle Kategorien</option>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              </div>
             </div>
+
+            {/* Min score slider */}
+            <div className="min-w-[200px] flex-1 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Min. Relevanz Score
+                </span>
+                <span className="text-sm font-bold text-primary">
+                  {clamp01(minScore).toFixed(2)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={minScore}
+                onChange={(e) => setMinScore(Number(e.target.value))}
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-secondary accent-primary
+                  [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4
+                  [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
+                  [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:shadow-lg"
+              />
+            </div>
+          </div>
+
+          {/* KW info badges */}
+          <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-2 rounded-xl bg-secondary px-4 py-2">
+              <Calendar className="h-4 w-4" />
+              Aktuelle KW:&nbsp;
+              <strong className="text-foreground">KW {currentWeek}</strong>
+            </span>
+            <span className="inline-flex items-center rounded-xl bg-secondary px-4 py-2">
+              Letzte KW:&nbsp;
+              <strong className="text-foreground">KW {previousWeek}</strong>
+            </span>
+            <span className="ml-auto inline-flex items-center gap-2 rounded-xl bg-secondary px-4 py-2">
+              <Filter className="h-4 w-4" />
+              <strong className="text-foreground">{filtered.length}</strong>&nbsp;Trends
+            </span>
           </div>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6">
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
-            <p className="text-sm text-zinc-400">Aktive Trends</p>
-            <p className="mt-3 text-4xl font-semibold tracking-tight">{kpis.count}</p>
-          </div>
-          <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
-            <p className="text-sm text-zinc-400">Durchschn. Score</p>
-            <p className="mt-3 text-4xl font-semibold tracking-tight text-[#1DB954]">
-              {kpis.avgScore === null ? "—" : clamp01(kpis.avgScore).toFixed(2)}
-            </p>
-          </div>
-          <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
-            <p className="text-sm text-zinc-400">Top Kategorie</p>
-            <p className="mt-3 text-3xl font-semibold tracking-tight">{kpis.topCategory}</p>
-          </div>
-          <div className="relative overflow-hidden rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
-            <p className="text-sm text-zinc-400">High Priority (Score ≥ 0.8)</p>
-            <p className="mt-3 text-4xl font-semibold tracking-tight text-rose-300">{kpis.highPriority}</p>
-            <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-rose-400/10 blur-2xl" />
-          </div>
-        </section>
-
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xl font-semibold tracking-tight">Verteilung nach Kategorie</p>
-              <BarChart3 className="h-5 w-5 text-zinc-400" />
+        {/* ── KPI Cards ──────────────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="glass-card group p-6 transition-colors hover:border-primary/20">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="kpi-label">Aktive Trends</span>
+              <TrendingUp className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
             </div>
+            <span className="kpi-value">{kpis.count}</span>
+          </div>
 
-            <div className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+          <div className="glass-card group p-6 transition-colors hover:border-primary/20">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="kpi-label">Durchschn. Score</span>
+              <BarChart3 className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
+            </div>
+            <span className="kpi-value text-primary">
+              {kpis.avgScore === null ? "\u2014" : clamp01(kpis.avgScore).toFixed(2)}
+            </span>
+          </div>
+
+          <div className="glass-card group p-6 transition-colors hover:border-primary/20">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="kpi-label">Top Kategorie</span>
+              <Award className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
+            </div>
+            <span className="kpi-value text-3xl">{kpis.topCategory}</span>
+          </div>
+
+          <div className="glass-card group relative overflow-hidden p-6 transition-colors hover:border-score-high/20">
+            <div className="mb-3 flex items-center justify-between">
+              <span className="kpi-label">High Priority (&ge; 0.8)</span>
+              <AlertTriangle className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-score-high" />
+            </div>
+            <span className="kpi-value text-score-high">{kpis.highPriority}</span>
+            <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-score-high/10 blur-2xl" />
+          </div>
+        </div>
+
+        {/* ── Charts ─────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+
+          {/* Category Distribution — horizontal bars */}
+          <div className="glass-card p-6">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-base font-semibold">Verteilung nach Kategorie</h3>
+              <BarChart3 className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="space-y-4">
               {kpis.bars.length === 0 ? (
-                <p className="col-span-full text-sm text-zinc-500">Keine Daten für Kategorie-Verteilung.</p>
+                <p className="text-sm text-muted-foreground">
+                  Keine Daten für Kategorie-Verteilung.
+                </p>
               ) : (
                 kpis.bars.map((bar) => {
                   const max = Math.max(...kpis.bars.map((x) => x.value), 1);
-                  const heightPct = Math.max(12, Math.round((bar.value / max) * 100));
+                  const pct = Math.max(4, (bar.value / max) * 100);
                   return (
-                    <div key={bar.name} className="space-y-2">
-                      <div className="flex h-28 items-end rounded-xl bg-zinc-900/70 p-2 ring-1 ring-zinc-700">
+                    <div key={bar.name} className="flex items-center gap-4">
+                      <span
+                        className="w-40 shrink-0 truncate text-sm text-muted-foreground"
+                        title={bar.name}
+                      >
+                        {bar.name}&nbsp;
+                        <span className="font-medium text-foreground">({bar.value})</span>
+                      </span>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
                         <div
-                          className="w-full rounded-lg bg-[#1DB954]/80"
-                          style={{ height: `${heightPct}%` }}
-                          title={`${bar.name}: ${bar.value}`}
+                          className="h-full rounded-full bg-primary transition-all duration-500"
+                          style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <p className="truncate text-sm text-zinc-400" title={bar.name}>
-                        {bar.name}
-                      </p>
                     </div>
                   );
                 })
@@ -588,65 +575,77 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-5">
-            <div className="flex items-center justify-between">
-              <p className="text-xl font-semibold tracking-tight">Relevanz-Verteilung</p>
-              <Flame className="h-5 w-5 text-zinc-400" />
+          {/* Relevance Distribution — donut */}
+          <div className="glass-card p-6">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-base font-semibold">Relevanz-Verteilung</h3>
+              <Flame className="h-5 w-5 text-muted-foreground" />
             </div>
-
-            <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-[180px_1fr] sm:items-center">
-              <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-full" style={donutStyle.style}>
-                <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full bg-zinc-900 text-center ring-1 ring-zinc-700">
-                  <p className="text-3xl font-semibold">{donutStyle.total}</p>
-                  <p className="text-xs text-zinc-400">Trends</p>
+            <div className="flex items-center gap-6">
+              <div className="relative h-[180px] w-[180px] flex-shrink-0">
+                <div className="h-full w-full rounded-full" style={donutStyle.style} />
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <div className="flex h-[110px] w-[110px] flex-col items-center justify-center rounded-full bg-glass text-center ring-1 ring-glass-border">
+                    <span className="text-2xl font-bold">{donutStyle.total}</span>
+                    <span className="text-xs text-muted-foreground">Trends</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between rounded-xl bg-zinc-900/70 px-3 py-2 ring-1 ring-zinc-700">
-                  <span className="text-zinc-300">High (0.8+)</span>
-                  <span className="font-semibold text-rose-300">{kpis.distHigh}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-xl bg-zinc-900/70 px-3 py-2 ring-1 ring-zinc-700">
-                  <span className="text-zinc-300">Mid (0.6–0.79)</span>
-                  <span className="font-semibold text-emerald-300">{kpis.distMid}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-xl bg-zinc-900/70 px-3 py-2 ring-1 ring-zinc-700">
-                  <span className="text-zinc-300">Low (&lt;0.6)</span>
-                  <span className="font-semibold text-zinc-300">{kpis.distLow}</span>
-                </div>
+              <div className="flex-1 space-y-3">
+                {(
+                  [
+                    { label: "High (0.8+)", count: kpis.distHigh, dot: "bg-score-high", text: "text-score-high" },
+                    { label: "Mid (0.6\u20130.79)", count: kpis.distMid, dot: "bg-score-mid", text: "text-score-mid" },
+                    { label: "Low (<0.6)", count: kpis.distLow, dot: "bg-score-low", text: "text-score-low" },
+                  ] as const
+                ).map(({ label, count, dot, text }) => (
+                  <div
+                    key={label}
+                    className="flex items-center justify-between rounded-xl bg-secondary px-4 py-2.5"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className={`h-2.5 w-2.5 rounded-full ${dot}`} />
+                      <span className="text-sm">{label}</span>
+                    </div>
+                    <span className={`text-sm font-bold ${text}`}>{count}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        <section className="space-y-4">
+        {/* ── Trend Cards ────────────────────────────────────── */}
+        <section className="space-y-6">
           {loading ? (
-            <div className="flex items-center gap-3 rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-6 text-zinc-300">
+            <div className="glass-card flex items-center gap-3 p-6 text-secondary-foreground">
               <LoaderCircle className="h-5 w-5 animate-spin" />
-              <p>Trends werden geladen…</p>
+              <p>Trends werden geladen&hellip;</p>
             </div>
           ) : error ? (
-            <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 p-6 text-rose-200">
-              <p className="font-semibold">Fehler beim Laden</p>
-              <p className="mt-1 text-sm opacity-90">{error}</p>
+            <div className="rounded-2xl border border-score-high/30 bg-score-high/10 p-6">
+              <p className="font-semibold text-score-high">Fehler beim Laden</p>
+              <p className="mt-1 text-sm text-score-high opacity-80">{error}</p>
             </div>
           ) : grouped.length === 0 ? (
-            <div className="rounded-3xl border border-zinc-700/70 bg-zinc-800/45 p-6 text-zinc-300">
-              <p className="font-semibold">Keine Trends gefunden</p>
-              <p className="mt-1 text-sm text-zinc-500">
-                Prüfe die n8n-Sync oder passe die Filter an.
+            <div className="glass-card p-12 text-center">
+              <p className="text-muted-foreground">
+                Keine Trends gefunden. Passe die Filter an.
               </p>
             </div>
           ) : (
             grouped.map(({ label, items }) => (
               <div key={label} className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold tracking-tight text-zinc-200">{label}</h2>
-                  <p className="text-sm text-zinc-500">{items.length} Trends</p>
+                  <h2 className="text-lg font-semibold">{label}</h2>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Filter className="h-4 w-4" />
+                    <span>{items.length} Trends</span>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {items.map((t) => {
                     const idKey = String(t.id);
                     const isOpen = Boolean(expanded[idKey]);
@@ -665,79 +664,76 @@ export default function Page() {
                     return (
                       <article
                         key={idKey}
-                        className="rounded-3xl border border-zinc-700/70 bg-zinc-800/50 p-4 shadow-sm shadow-black/35"
+                        onClick={() => toggleExpanded(t.id)}
+                        className="glass-card-hover p-5"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <span
-                              className={cx(
-                                "inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
-                                categoryStyles(category)
-                              )}
-                            >
+                        {/* Badge row */}
+                        <div className="mb-3 flex items-start justify-between gap-2">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <span className={cx("category-badge ring-1", categoryStyles(category))}>
                               {category}
                             </span>
                             {score !== null ? (
-                              <span className={cx("text-xs font-semibold", scoreColor(score))}>
+                              <span className={cx("score-badge", scoreColor(score))}>
                                 {formatScore(score)}
                               </span>
                             ) : null}
                           </div>
-
                           {date ? (
-                            <span className="shrink-0 text-xs text-zinc-500">
+                            <span className="shrink-0 text-xs text-muted-foreground">
                               {date.toLocaleDateString("de-DE")}
                             </span>
                           ) : null}
                         </div>
 
-                        <h3 className="mt-3 text-base font-semibold leading-tight text-zinc-100">{title}</h3>
+                        {/* Title */}
+                        <h3 className="mb-2 text-base font-semibold leading-snug">{title}</h3>
 
+                        {/* Preview (collapsed only) */}
                         {preview && !isOpen ? (
-                          <p className="mt-2 text-[13px] leading-5 text-zinc-300">{preview}</p>
+                          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                            {preview}
+                          </p>
                         ) : null}
 
-                        <button
-                          type="button"
-                          onClick={() => toggleExpanded(t.id)}
-                          className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[#1DB954] hover:underline"
-                        >
-                          {isOpen ? (
-                            <>
-                              <Minus className="h-4 w-4" /> Weniger anzeigen
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="h-4 w-4" /> Details anzeigen
-                            </>
-                          )}
-                        </button>
+                        {/* Expand toggle */}
+                        <div className="mt-3 flex items-center gap-1 text-sm font-medium text-primary">
+                          <span>{isOpen ? "Weniger anzeigen" : "Details anzeigen"}</span>
+                          <ChevronDown
+                            className={cx(
+                              "h-4 w-4 transition-transform duration-200",
+                              isOpen && "rotate-180"
+                            )}
+                          />
+                        </div>
 
+                        {/* Expanded details */}
                         {isOpen ? (
-                          <div className="mt-3 space-y-3 border-t border-zinc-700/80 pt-3">
+                          <div className="mt-3 space-y-3 border-t border-glass-border pt-3">
                             {summary ? (
-                              <p className="text-sm leading-6 text-zinc-200">{summary}</p>
+                              <p className="text-sm leading-6 text-secondary-foreground">
+                                {summary}
+                              </p>
                             ) : null}
-
-                            <div className="grid grid-cols-1 gap-2 text-sm text-zinc-300">
-                              {impact ? (
-                                <div className="rounded-xl bg-zinc-900/70 px-3 py-2 ring-1 ring-zinc-700">
-                                  <p className="text-xs uppercase tracking-wide text-zinc-500">Spotify Relevanz</p>
-                                  <p className="mt-1 font-semibold text-[#1DB954]">{impact}</p>
-                                </div>
-                              ) : null}
-
-                              {url ? (
-                                <a
-                                  href={url}
-                                  target="_blank"
-                                  rel="noreferrer noopener"
-                                  className="inline-flex items-center justify-center gap-1 rounded-xl border border-zinc-700 bg-zinc-900/70 px-3 py-2 font-medium text-zinc-200 hover:bg-zinc-900"
-                                >
-                                  Quelle öffnen <ExternalLink className="h-4 w-4" />
-                                </a>
-                              ) : null}
-                            </div>
+                            {impact ? (
+                              <div className="rounded-xl bg-secondary px-3 py-2">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                                  Spotify Relevanz
+                                </p>
+                                <p className="mt-1 font-semibold text-primary">{impact}</p>
+                              </div>
+                            ) : null}
+                            {url ? (
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center justify-center gap-1 rounded-xl border border-glass-border bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-glass-hover"
+                              >
+                                Quelle öffnen <ExternalLink className="h-4 w-4" />
+                              </a>
+                            ) : null}
                           </div>
                         ) : null}
                       </article>
@@ -748,7 +744,7 @@ export default function Page() {
             ))
           )}
         </section>
-      </main>
+      </div>
     </div>
   );
 }
