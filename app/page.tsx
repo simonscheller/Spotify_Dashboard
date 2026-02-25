@@ -1,18 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Award,
   BarChart3,
   Calendar,
+  Check,
   ChevronDown,
   ExternalLink,
   Filter,
   Flame,
   LoaderCircle,
+  Search,
   Sparkles,
   TrendingUp,
+  X,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 
@@ -31,7 +34,7 @@ type Trend = {
 
 type GroupBy = "week" | "day" | "month";
 
-/* ── Utility functions (data logic — unchanged) ──────────────── */
+/* ── Utility functions ───────────────────────────────────────── */
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
@@ -55,8 +58,7 @@ function getISOWeek(date: Date) {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-  return weekNo;
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
 function isoDayKey(d: Date) {
@@ -72,7 +74,6 @@ function formatScore(score: number | null) {
   return clamp01(score).toFixed(2);
 }
 
-/** Maps score to design-token colour classes (aligned with spotify-pulse) */
 function scoreColor(score: number | null) {
   if (score === null || Number.isNaN(score)) return "text-muted-foreground";
   const s = clamp01(score);
@@ -81,11 +82,9 @@ function scoreColor(score: number | null) {
   return "text-score-low";
 }
 
-/** Category badge colour classes */
 function categoryStyles(category: string) {
   const key = category.toLowerCase();
-  if (key.includes("spotify"))
-    return "bg-[#1DB954]/20 text-[#35e06f] ring-[#1DB954]/40";
+  if (key.includes("spotify")) return "bg-[#1DB954]/20 text-[#35e06f] ring-[#1DB954]/40";
   if (key.includes("wettbewerb") || key.includes("competition"))
     return "bg-score-high/20 text-score-high ring-score-high/40";
   if (key.includes("marketing") || key.includes("markt"))
@@ -125,21 +124,227 @@ function compactText(text: string, len: number) {
   return `${cleaned.slice(0, len).trimEnd()}\u2026`;
 }
 
+/** Extract domain from URL for source clustering */
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url.slice(0, 40) || "Unbekannte Quelle";
+  }
+}
+
+/* ── TrendCard component ─────────────────────────────────────── */
+type TrendCardProps = {
+  t: Trend;
+  isOpen: boolean;
+  onToggle: () => void;
+};
+
+function TrendCard({ t, isOpen, onToggle }: TrendCardProps) {
+  const topic = (t.topic ?? "").trim();
+  const summary = (t.summary ?? "").trim();
+  const impact = (t.spotify_impact ?? "").trim();
+  const url = (t.url ?? "").trim();
+  const category = (t.category ?? "").trim() || "Unkategorisiert";
+  const score = t.relevance_score ?? null;
+  const date = safeDate(t.published_date);
+  const title = topic || (summary ? compactText(summary, 75) : "Trend ohne Titel");
+  const preview = summary ? compactText(summary, 120) : "";
+
+  return (
+    <article onClick={onToggle} className="glass-card-hover p-5">
+      {/* Badge row */}
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className={cx("category-badge ring-1", categoryStyles(category))}>
+            {category}
+          </span>
+          {score !== null ? (
+            <span className={cx("score-badge", scoreColor(score))}>{formatScore(score)}</span>
+          ) : null}
+        </div>
+        {date ? (
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {date.toLocaleDateString("de-DE")}
+          </span>
+        ) : null}
+      </div>
+
+      <h3 className="mb-2 text-base font-semibold leading-snug">{title}</h3>
+
+      {preview && !isOpen ? (
+        <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{preview}</p>
+      ) : null}
+
+      <div className="mt-3 flex items-center gap-1 text-sm font-medium text-primary">
+        <span>{isOpen ? "Weniger anzeigen" : "Details anzeigen"}</span>
+        <ChevronDown
+          className={cx("h-4 w-4 transition-transform duration-200", isOpen && "rotate-180")}
+        />
+      </div>
+
+      {isOpen ? (
+        <div className="mt-3 space-y-3 border-t border-glass-border pt-3">
+          {summary ? (
+            <p className="text-sm leading-6 text-secondary-foreground">{summary}</p>
+          ) : null}
+          {impact ? (
+            <div className="rounded-xl bg-secondary px-3 py-2">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Spotify Relevanz
+              </p>
+              <p className="mt-1 font-semibold text-primary">{impact}</p>
+            </div>
+          ) : null}
+          {url ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer noopener"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center justify-center gap-1 rounded-xl border border-glass-border bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-glass-hover"
+            >
+              Quelle öffnen <ExternalLink className="h-4 w-4" />
+            </a>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+/* ── SourceGroup component ───────────────────────────────────── */
+type SourceGroupProps = {
+  domain: string;
+  items: Trend[];
+  isOpen: boolean;
+  onToggle: () => void;
+  expanded: Record<string, boolean>;
+  onToggleExpand: (id: Trend["id"]) => void;
+};
+
+function SourceGroup({ domain, items, isOpen, onToggle, expanded, onToggleExpand }: SourceGroupProps) {
+  const high = items.filter((t) => (t.relevance_score ?? 0) >= 0.8).length;
+  const mid = items.filter(
+    (t) => (t.relevance_score ?? 0) >= 0.6 && (t.relevance_score ?? 0) < 0.8
+  ).length;
+  const scores = items
+    .map((t) => t.relevance_score)
+    .filter((v): v is number => typeof v === "number");
+  const avgScore = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
+
+  const topCat = (() => {
+    const map = new Map<string, number>();
+    for (const t of items) {
+      const c = (t.category ?? "").trim() || "Unkategorisiert";
+      map.set(c, (map.get(c) ?? 0) + 1);
+    }
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+  })();
+
+  return (
+    <div>
+      {/* Header row */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="glass-card mb-2 flex w-full items-center justify-between p-3 text-left transition-colors hover:bg-glass-hover"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <ChevronDown
+            className={cx(
+              "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+              isOpen ? "rotate-0" : "-rotate-90"
+            )}
+          />
+          <span className="truncate text-sm font-semibold text-foreground">{domain}</span>
+          <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+            {items.length}&nbsp;Trends
+          </span>
+        </div>
+
+        <div className="ml-3 flex shrink-0 flex-wrap items-center gap-1.5">
+          {high > 0 && (
+            <span className="rounded-full bg-score-high/20 px-2 py-0.5 text-[10px] font-semibold text-score-high">
+              {high}&nbsp;High
+            </span>
+          )}
+          {mid > 0 && (
+            <span className="rounded-full bg-score-mid/20 px-2 py-0.5 text-[10px] font-semibold text-score-mid">
+              {mid}&nbsp;Mid
+            </span>
+          )}
+          {topCat ? (
+            <span className={cx("category-badge px-2 py-0.5 text-[10px] ring-1", categoryStyles(topCat))}>
+              {topCat}
+            </span>
+          ) : null}
+          {avgScore !== null ? (
+            <span className="text-xs text-muted-foreground">
+              \u00d8&nbsp;{clamp01(avgScore).toFixed(2)}
+            </span>
+          ) : null}
+        </div>
+      </button>
+
+      {/* Cards grid */}
+      {isOpen ? (
+        <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {items.map((t) => (
+            <TrendCard
+              key={String(t.id)}
+              t={t}
+              isOpen={Boolean(expanded[String(t.id)])}
+              onToggle={() => onToggleExpand(t.id)}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /* ── Page component ──────────────────────────────────────────── */
 export default function Page() {
   const now = useMemo(() => new Date(), []);
   const currentWeek = useMemo(() => getISOWeek(now), [now]);
   const previousWeek = useMemo(() => (currentWeek > 1 ? currentWeek - 1 : 52), [currentWeek]);
 
+  /* Filter state */
   const [groupBy, setGroupBy] = useState<GroupBy>("week");
   const [selectedSlot, setSelectedSlot] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [minScore, setMinScore] = useState<number>(0);
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
+  /* Dropdown open state */
+  const [isSlotOpen, setIsSlotOpen] = useState(false);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const slotRef = useRef<HTMLDivElement>(null);
+  const categoryRef = useRef<HTMLDivElement>(null);
+
+  /* Card / source-group expand state */
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [sourceGroupOpen, setSourceGroupOpen] = useState<Record<string, boolean>>({});
+
+  /* Data state */
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trends, setTrends] = useState<Trend[]>([]);
+
+  /* ── Close dropdowns on outside click ───────────────────── */
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (slotRef.current && !slotRef.current.contains(e.target as Node)) {
+        setIsSlotOpen(false);
+      }
+      if (categoryRef.current && !categoryRef.current.contains(e.target as Node)) {
+        setIsCategoryOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   /* ── Data fetching (unchanged) ───────────────────────────── */
   const loadTrends = useCallback(async (background = false) => {
@@ -234,7 +439,9 @@ export default function Page() {
         const hasCategory = Boolean((t.category ?? "").trim());
         const hasDate = Boolean((t.published_date ?? "").trim());
         const hasWeek = typeof t.week_number === "number" && t.week_number > 0;
-        return hasTopic || hasSummary || hasImpact || hasUrl || hasScore || hasCategory || hasDate || hasWeek;
+        return (
+          hasTopic || hasSummary || hasImpact || hasUrl || hasScore || hasCategory || hasDate || hasWeek
+        );
       });
   }, [trends]);
 
@@ -266,16 +473,25 @@ export default function Page() {
     setSelectedSlot("all");
   }, [groupBy]);
 
+  /* filtered — includes search query */
   const filtered = useMemo(() => {
     const min = clamp01(minScore);
+    const q = searchQuery.toLowerCase().trim();
     return normalizedTrends.filter((t) => {
       if ((t.relevance_score ?? 0) < min) return false;
       const category = (t.category ?? "").trim();
       if (selectedCategory !== "all" && category !== selectedCategory) return false;
       if (selectedSlot !== "all" && slotKeyForTrend(t, groupBy) !== selectedSlot) return false;
+      if (q) {
+        const matches =
+          (t.topic ?? "").toLowerCase().includes(q) ||
+          (t.summary ?? "").toLowerCase().includes(q) ||
+          (t.category ?? "").toLowerCase().includes(q);
+        if (!matches) return false;
+      }
       return true;
     });
-  }, [groupBy, minScore, normalizedTrends, selectedCategory, selectedSlot]);
+  }, [groupBy, minScore, normalizedTrends, selectedCategory, selectedSlot, searchQuery]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, Trend[]>();
@@ -340,15 +556,55 @@ export default function Page() {
     };
   }, [kpis.distHigh, kpis.distLow, kpis.distMid]);
 
-  const toggleExpanded = (id: Trend["id"]) => {
+  /* Active filter chips */
+  const activeFilters = useMemo(() => {
+    const chips: { label: string; onRemove: () => void }[] = [];
+    if (selectedSlot !== "all")
+      chips.push({ label: slotLabelFromKey(selectedSlot, groupBy), onRemove: () => setSelectedSlot("all") });
+    if (selectedCategory !== "all")
+      chips.push({ label: selectedCategory, onRemove: () => setSelectedCategory("all") });
+    if (minScore > 0)
+      chips.push({ label: `Score \u2265 ${clamp01(minScore).toFixed(2)}`, onRemove: () => setMinScore(0) });
+    return chips;
+  }, [selectedSlot, selectedCategory, minScore, groupBy]);
+
+  /* KPI progress percentages */
+  const activePct = normalizedTrends.length > 0 ? (kpis.count / normalizedTrends.length) * 100 : 0;
+  const scorePct = kpis.avgScore !== null ? clamp01(kpis.avgScore) * 100 : 0;
+  const highPct = kpis.count > 0 ? (kpis.highPriority / kpis.count) * 100 : 0;
+
+  /* Stable callbacks */
+  const toggleExpanded = useCallback((id: Trend["id"]) => {
     const key = String(id);
     setExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
+  }, []);
+
+  const toggleSourceGroup = useCallback((key: string, defaultOpen: boolean) => {
+    setSourceGroupOpen((prev) => ({
+      ...prev,
+      [key]: !(key in prev ? prev[key] : defaultOpen),
+    }));
+  }, []);
+
+  /* Flat layout when searching or category-filtering (avoids fragmented results) */
+  const useFlatLayout = Boolean(searchQuery.trim()) || selectedCategory !== "all";
+
+  /* Slot label for current selection */
+  const selectedSlotLabel =
+    selectedSlot === "all"
+      ? groupBy === "week"
+        ? "Alle Wochen"
+        : groupBy === "day"
+          ? "Alle Tage"
+          : "Alle Monate"
+      : (slotOptions.find((s) => s.key === selectedSlot)?.label ?? selectedSlot);
+
+  const selectedCategoryLabel = selectedCategory === "all" ? "Alle Kategorien" : selectedCategory;
 
   /* ── Render ──────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-background p-6 lg:p-10">
-      {/* Ambient Spotify-green radial gradient */}
+      {/* Ambient radial gradient */}
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_0%,rgba(29,185,84,0.14),rgba(0,0,0,0))]" />
 
       <div className="mx-auto max-w-7xl space-y-6">
@@ -362,13 +618,10 @@ export default function Page() {
               </svg>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Spotify
-              </p>
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Spotify</p>
               <h1 className="text-2xl font-bold tracking-tight">Trend Radar</h1>
             </div>
           </div>
-
           <div className="hidden items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs text-secondary-foreground ring-1 ring-glass-border sm:flex">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
             Fresh Insights
@@ -376,12 +629,14 @@ export default function Page() {
         </header>
 
         {/* ── Filter Bar ─────────────────────────────────────── */}
-        <div className="glass-card p-5">
-          <div className="flex flex-wrap items-end gap-6">
+        <div className="glass-card p-5 space-y-5">
+
+          {/* Row 1: time toggle + custom dropdowns */}
+          <div className="flex flex-wrap items-end gap-4">
 
             {/* Time range toggle */}
             <div className="space-y-1.5">
-              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Zeitraum
               </span>
               <div className="flex gap-1 rounded-xl bg-secondary p-1">
@@ -404,66 +659,115 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Slot select */}
-            <div className="space-y-1.5">
-              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {/* Slot custom dropdown */}
+            <div className="space-y-1.5" ref={slotRef}>
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Auswahl
               </span>
               <div className="relative">
-                <select
-                  value={selectedSlot}
-                  onChange={(e) => setSelectedSlot(e.target.value)}
-                  className="h-11 min-w-[180px] cursor-pointer appearance-none rounded-xl bg-secondary px-4 pr-10 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                <button
+                  type="button"
+                  onClick={() => { setIsSlotOpen((v) => !v); setIsCategoryOpen(false); }}
+                  className="flex h-11 min-w-[180px] items-center justify-between gap-3 rounded-xl bg-secondary px-4 text-sm text-foreground transition-colors hover:bg-glass-hover"
                 >
-                  <option value="all">
-                    {groupBy === "week"
-                      ? "Alle Wochen"
-                      : groupBy === "day"
-                        ? "Alle Tage"
-                        : "Alle Monate"}
-                  </option>
-                  {slotOptions.map((slot) => (
-                    <option key={slot.key} value={slot.key}>
-                      {slot.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <span className="truncate">{selectedSlotLabel}</span>
+                  <ChevronDown
+                    className={cx("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200", isSlotOpen && "rotate-180")}
+                  />
+                </button>
+                {isSlotOpen && (
+                  <div className="absolute left-0 top-full z-50 mt-1.5 min-w-full overflow-hidden rounded-xl border border-glass-border bg-glass shadow-xl backdrop-blur-xl">
+                    <div className="max-h-60 overflow-y-auto py-1">
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedSlot("all"); setIsSlotOpen(false); }}
+                        className="flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-glass-hover"
+                      >
+                        <span className={selectedSlot === "all" ? "text-primary" : ""}>
+                          {groupBy === "week" ? "Alle Wochen" : groupBy === "day" ? "Alle Tage" : "Alle Monate"}
+                        </span>
+                        {selectedSlot === "all" && <Check className="h-3.5 w-3.5 text-primary" />}
+                      </button>
+                      {slotOptions.map((slot) => (
+                        <button
+                          key={slot.key}
+                          type="button"
+                          onClick={() => { setSelectedSlot(slot.key); setIsSlotOpen(false); }}
+                          className="flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-glass-hover"
+                        >
+                          <span className={selectedSlot === slot.key ? "text-primary" : ""}>{slot.label}</span>
+                          {selectedSlot === slot.key && <Check className="h-3.5 w-3.5 text-primary" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Category filter */}
-            <div className="space-y-1.5">
-              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            {/* Category custom dropdown */}
+            <div className="space-y-1.5" ref={categoryRef}>
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Kategorie
               </span>
               <div className="relative">
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="h-11 min-w-[200px] cursor-pointer appearance-none rounded-xl bg-secondary px-4 pr-10 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                <button
+                  type="button"
+                  onClick={() => { setIsCategoryOpen((v) => !v); setIsSlotOpen(false); }}
+                  className="flex h-11 min-w-[200px] items-center justify-between gap-3 rounded-xl bg-secondary px-4 text-sm text-foreground transition-colors hover:bg-glass-hover"
                 >
-                  <option value="all">Alle Kategorien</option>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <span className="truncate">{selectedCategoryLabel}</span>
+                  <ChevronDown
+                    className={cx("h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200", isCategoryOpen && "rotate-180")}
+                  />
+                </button>
+                {isCategoryOpen && (
+                  <div className="absolute left-0 top-full z-50 mt-1.5 min-w-full overflow-hidden rounded-xl border border-glass-border bg-glass shadow-xl backdrop-blur-xl">
+                    <div className="max-h-60 overflow-y-auto py-1">
+                      <button
+                        type="button"
+                        onClick={() => { setSelectedCategory("all"); setIsCategoryOpen(false); }}
+                        className="flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-glass-hover"
+                      >
+                        <span className={selectedCategory === "all" ? "text-primary" : ""}>Alle Kategorien</span>
+                        {selectedCategory === "all" && <Check className="h-3.5 w-3.5 text-primary" />}
+                      </button>
+                      {categories.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => { setSelectedCategory(c); setIsCategoryOpen(false); }}
+                          className="flex w-full items-center justify-between px-4 py-2.5 text-sm transition-colors hover:bg-glass-hover"
+                        >
+                          <span className={selectedCategory === c ? "text-primary" : ""}>{c}</span>
+                          {selectedCategory === c && <Check className="h-3.5 w-3.5 text-primary" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+          </div>
 
-            {/* Min score slider */}
-            <div className="min-w-[200px] flex-1 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Min. Relevanz Score
-                </span>
-                <span className="text-sm font-bold text-primary">
-                  {clamp01(minScore).toFixed(2)}
-                </span>
+          {/* Row 2: Score slider (full width) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Min. Relevanz Score
+              </span>
+              <span className="text-sm font-bold text-primary">{clamp01(minScore).toFixed(2)}</span>
+            </div>
+            {/* Slider wrapper with visual track + tooltip */}
+            <div className="relative pt-7 pb-1">
+              {/* Visual fill track */}
+              <div className="pointer-events-none absolute left-0 right-0 top-7 h-2 -translate-y-px overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-150"
+                  style={{ width: `${clamp01(minScore) * 100}%` }}
+                />
               </div>
+              {/* Range input */}
               <input
                 type="range"
                 min={0}
@@ -471,24 +775,70 @@ export default function Page() {
                 step={0.01}
                 value={minScore}
                 onChange={(e) => setMinScore(Number(e.target.value))}
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-secondary accent-primary
-                  [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4
-                  [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full
-                  [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:shadow-lg"
+                className="score-slider relative"
               />
+              {/* Floating value tooltip */}
+              <div
+                className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-md bg-secondary px-1.5 py-0.5 text-xs font-bold text-primary ring-1 ring-glass-border transition-all duration-150"
+                style={{ left: `clamp(14px, ${clamp01(minScore) * 100}%, calc(100% - 14px))` }}
+              >
+                {clamp01(minScore).toFixed(2)}
+              </div>
+            </div>
+            {/* Axis labels */}
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              <span>0.00</span>
+              <span>1.00</span>
             </div>
           </div>
 
-          {/* KW info badges */}
-          <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          {/* Row 3: KW quickfilter (week mode only) */}
+          {groupBy === "week" && slotOptions.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                Schnellfilter KW
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedSlot("all")}
+                  className={selectedSlot === "all" ? "filter-chip-active" : "filter-chip-inactive"}
+                >
+                  Alle
+                </button>
+                {slotOptions.slice(0, 4).map((slot) => (
+                  <button
+                    key={slot.key}
+                    type="button"
+                    onClick={() => setSelectedSlot(slot.key)}
+                    className={selectedSlot === slot.key ? "filter-chip-active" : "filter-chip-inactive"}
+                  >
+                    {slot.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Row 4: Active filter chips + KW info */}
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            {activeFilters.map((f) => (
+              <button
+                key={f.label}
+                type="button"
+                onClick={f.onRemove}
+                className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-3 py-1 text-xs font-medium text-primary ring-1 ring-primary/30 transition-colors hover:bg-primary/25"
+              >
+                {f.label}
+                <X className="h-3 w-3" />
+              </button>
+            ))}
             <span className="inline-flex items-center gap-2 rounded-xl bg-secondary px-4 py-2">
               <Calendar className="h-4 w-4" />
-              Aktuelle KW:&nbsp;
-              <strong className="text-foreground">KW {currentWeek}</strong>
+              Aktuelle KW:&nbsp;<strong className="text-foreground">KW {currentWeek}</strong>
             </span>
             <span className="inline-flex items-center rounded-xl bg-secondary px-4 py-2">
-              Letzte KW:&nbsp;
-              <strong className="text-foreground">KW {previousWeek}</strong>
+              Letzte KW:&nbsp;<strong className="text-foreground">KW {previousWeek}</strong>
             </span>
             <span className="ml-auto inline-flex items-center gap-2 rounded-xl bg-secondary px-4 py-2">
               <Filter className="h-4 w-4" />
@@ -497,17 +847,71 @@ export default function Page() {
           </div>
         </div>
 
+        {/* ── Search Bar ─────────────────────────────────────── */}
+        <div className="glass-card flex items-center gap-3 px-4 py-3">
+          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Trends durchsuchen\u2026"
+            className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+          {searchQuery ? (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="shrink-0 rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+        {/* Search result hint */}
+        {searchQuery.trim() ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>
+              <strong className="text-foreground">{filtered.length}</strong>&nbsp;Ergebnisse für&nbsp;
+              <em className="text-foreground">&bdquo;{searchQuery.trim()}&ldquo;</em>
+            </span>
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="text-primary underline-offset-2 hover:underline"
+            >
+              Zurücksetzen
+            </button>
+          </div>
+        ) : null}
+
         {/* ── KPI Cards ──────────────────────────────────────── */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="glass-card group p-6 transition-colors hover:border-primary/20">
+          {/* Active Trends */}
+          <div
+            className="glass-card kpi-enter group relative p-6 transition-colors hover:border-primary/20"
+            style={{ animationDelay: "0ms" }}
+          >
             <div className="mb-3 flex items-center justify-between">
               <span className="kpi-label">Aktive Trends</span>
               <TrendingUp className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
             </div>
             <span className="kpi-value">{kpis.count}</span>
+            <div className="mt-4 h-1 overflow-hidden rounded-full bg-secondary">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-700"
+                style={{ width: `${activePct}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              {Math.round(activePct)}% aller Trends
+            </p>
           </div>
 
-          <div className="glass-card group p-6 transition-colors hover:border-primary/20">
+          {/* Avg Score */}
+          <div
+            className="glass-card kpi-enter group p-6 transition-colors hover:border-primary/20"
+            style={{ animationDelay: "80ms" }}
+          >
             <div className="mb-3 flex items-center justify-between">
               <span className="kpi-label">Durchschn. Score</span>
               <BarChart3 className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
@@ -515,30 +919,70 @@ export default function Page() {
             <span className="kpi-value text-primary">
               {kpis.avgScore === null ? "\u2014" : clamp01(kpis.avgScore).toFixed(2)}
             </span>
+            <div className="mt-4 h-1 overflow-hidden rounded-full bg-secondary">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-700"
+                style={{ width: `${scorePct}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              Relevanz-Durchschnitt
+            </p>
           </div>
 
-          <div className="glass-card group p-6 transition-colors hover:border-primary/20">
+          {/* Top Category */}
+          <div
+            className="glass-card kpi-enter group p-6 transition-colors hover:border-primary/20"
+            style={{ animationDelay: "160ms" }}
+          >
             <div className="mb-3 flex items-center justify-between">
               <span className="kpi-label">Top Kategorie</span>
               <Award className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
             </div>
             <span className="kpi-value text-3xl">{kpis.topCategory}</span>
+            <div className="mt-4">
+              {kpis.topCategory && kpis.topCategory !== "\u2014" ? (
+                <span className={cx("category-badge ring-1 text-[11px]", categoryStyles(kpis.topCategory))}>
+                  {kpis.topCategory}
+                </span>
+              ) : (
+                <span className="text-[11px] text-muted-foreground">Noch keine Daten</span>
+              )}
+            </div>
           </div>
 
-          <div className="glass-card group relative overflow-hidden p-6 transition-colors hover:border-score-high/20">
+          {/* High Priority */}
+          <div
+            className="glass-card kpi-enter group relative overflow-hidden p-6 transition-colors hover:border-score-high/20"
+            style={{ animationDelay: "240ms" }}
+          >
             <div className="mb-3 flex items-center justify-between">
               <span className="kpi-label">High Priority (&ge; 0.8)</span>
               <AlertTriangle className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-score-high" />
             </div>
             <span className="kpi-value text-score-high">{kpis.highPriority}</span>
+            <div className="mt-4 h-1 overflow-hidden rounded-full bg-secondary">
+              <div
+                className="h-full rounded-full bg-score-high transition-all duration-700"
+                style={{ width: `${highPct}%` }}
+              />
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              {Math.round(highPct)}% der gefilterten Trends
+            </p>
+            {/* Ambient glow */}
             <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-score-high/10 blur-2xl" />
+            {/* Pulsing ring when there are high-priority items */}
+            {kpis.highPriority > 0 ? (
+              <div className="animate-pulse pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-score-high/30" />
+            ) : null}
           </div>
         </div>
 
         {/* ── Charts ─────────────────────────────────────────── */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
 
-          {/* Category Distribution — horizontal bars */}
+          {/* Category Distribution */}
           <div className="glass-card p-6">
             <div className="mb-6 flex items-center justify-between">
               <h3 className="text-base font-semibold">Verteilung nach Kategorie</h3>
@@ -546,19 +990,14 @@ export default function Page() {
             </div>
             <div className="space-y-4">
               {kpis.bars.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Keine Daten für Kategorie-Verteilung.
-                </p>
+                <p className="text-sm text-muted-foreground">Keine Daten für Kategorie-Verteilung.</p>
               ) : (
                 kpis.bars.map((bar) => {
                   const max = Math.max(...kpis.bars.map((x) => x.value), 1);
                   const pct = Math.max(4, (bar.value / max) * 100);
                   return (
                     <div key={bar.name} className="flex items-center gap-4">
-                      <span
-                        className="w-40 shrink-0 truncate text-sm text-muted-foreground"
-                        title={bar.name}
-                      >
+                      <span className="w-40 shrink-0 truncate text-sm text-muted-foreground" title={bar.name}>
                         {bar.name}&nbsp;
                         <span className="font-medium text-foreground">({bar.value})</span>
                       </span>
@@ -575,7 +1014,7 @@ export default function Page() {
             </div>
           </div>
 
-          {/* Relevance Distribution — donut */}
+          {/* Relevance Donut */}
           <div className="glass-card p-6">
             <div className="mb-6 flex items-center justify-between">
               <h3 className="text-base font-semibold">Relevanz-Verteilung</h3>
@@ -591,7 +1030,6 @@ export default function Page() {
                   </div>
                 </div>
               </div>
-
               <div className="flex-1 space-y-3">
                 {(
                   [
@@ -600,10 +1038,7 @@ export default function Page() {
                     { label: "Low (<0.6)", count: kpis.distLow, dot: "bg-score-low", text: "text-score-low" },
                   ] as const
                 ).map(({ label, count, dot, text }) => (
-                  <div
-                    key={label}
-                    className="flex items-center justify-between rounded-xl bg-secondary px-4 py-2.5"
-                  >
+                  <div key={label} className="flex items-center justify-between rounded-xl bg-secondary px-4 py-2.5">
                     <div className="flex items-center gap-2">
                       <div className={`h-2.5 w-2.5 rounded-full ${dot}`} />
                       <span className="text-sm">{label}</span>
@@ -616,7 +1051,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* ── Trend Cards ────────────────────────────────────── */}
+        {/* ── Trend Cards / Source Groups ─────────────────────── */}
         <section className="space-y-6">
           {loading ? (
             <div className="glass-card flex items-center gap-3 p-6 text-secondary-foreground">
@@ -637,6 +1072,7 @@ export default function Page() {
           ) : (
             grouped.map(({ label, items }) => (
               <div key={label} className="space-y-3">
+                {/* Time-slot heading */}
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">{label}</h2>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -645,101 +1081,58 @@ export default function Page() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {items.map((t) => {
-                    const idKey = String(t.id);
-                    const isOpen = Boolean(expanded[idKey]);
-
-                    const topic = (t.topic ?? "").trim();
-                    const summary = (t.summary ?? "").trim();
-                    const impact = (t.spotify_impact ?? "").trim();
-                    const url = (t.url ?? "").trim();
-                    const category = (t.category ?? "").trim() || "Unkategorisiert";
-                    const score = t.relevance_score ?? null;
-                    const date = safeDate(t.published_date);
-
-                    const title = topic || (summary ? compactText(summary, 75) : "Trend ohne Titel");
-                    const preview = summary ? compactText(summary, 120) : "";
-
-                    return (
-                      <article
-                        key={idKey}
-                        onClick={() => toggleExpanded(t.id)}
-                        className="glass-card-hover p-5"
-                      >
-                        {/* Badge row */}
-                        <div className="mb-3 flex items-start justify-between gap-2">
-                          <div className="flex min-w-0 flex-wrap items-center gap-2">
-                            <span className={cx("category-badge ring-1", categoryStyles(category))}>
-                              {category}
-                            </span>
-                            {score !== null ? (
-                              <span className={cx("score-badge", scoreColor(score))}>
-                                {formatScore(score)}
-                              </span>
-                            ) : null}
-                          </div>
-                          {date ? (
-                            <span className="shrink-0 text-xs text-muted-foreground">
-                              {date.toLocaleDateString("de-DE")}
-                            </span>
-                          ) : null}
-                        </div>
-
-                        {/* Title */}
-                        <h3 className="mb-2 text-base font-semibold leading-snug">{title}</h3>
-
-                        {/* Preview (collapsed only) */}
-                        {preview && !isOpen ? (
-                          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                            {preview}
-                          </p>
-                        ) : null}
-
-                        {/* Expand toggle */}
-                        <div className="mt-3 flex items-center gap-1 text-sm font-medium text-primary">
-                          <span>{isOpen ? "Weniger anzeigen" : "Details anzeigen"}</span>
-                          <ChevronDown
-                            className={cx(
-                              "h-4 w-4 transition-transform duration-200",
-                              isOpen && "rotate-180"
-                            )}
-                          />
-                        </div>
-
-                        {/* Expanded details */}
-                        {isOpen ? (
-                          <div className="mt-3 space-y-3 border-t border-glass-border pt-3">
-                            {summary ? (
-                              <p className="text-sm leading-6 text-secondary-foreground">
-                                {summary}
-                              </p>
-                            ) : null}
-                            {impact ? (
-                              <div className="rounded-xl bg-secondary px-3 py-2">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                                  Spotify Relevanz
-                                </p>
-                                <p className="mt-1 font-semibold text-primary">{impact}</p>
-                              </div>
-                            ) : null}
-                            {url ? (
-                              <a
-                                href={url}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center justify-center gap-1 rounded-xl border border-glass-border bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground transition-colors hover:bg-glass-hover"
-                              >
-                                Quelle öffnen <ExternalLink className="h-4 w-4" />
-                              </a>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </article>
+                {useFlatLayout ? (
+                  /* Flat grid — used when searching or filtering by category */
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {items.map((t) => (
+                      <TrendCard
+                        key={String(t.id)}
+                        t={t}
+                        isOpen={Boolean(expanded[String(t.id)])}
+                        onToggle={() => toggleExpanded(t.id)}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  /* Source-grouped layout */
+                  (() => {
+                    const bySource = new Map<string, Trend[]>();
+                    for (const t of items) {
+                      const domain =
+                        (t.url ?? "").trim()
+                          ? extractDomain((t.url ?? "").trim())
+                          : "Unbekannte Quelle";
+                      if (!bySource.has(domain)) bySource.set(domain, []);
+                      bySource.get(domain)!.push(t);
+                    }
+                    const sortedSources = Array.from(bySource.entries()).sort(
+                      (a, b) => b[1].length - a[1].length
                     );
-                  })}
-                </div>
+                    return (
+                      <div className="space-y-1">
+                        {sortedSources.map(([domain, sourceItems]) => {
+                          const groupKey = `${label}::${domain}`;
+                          const defaultOpen = sourceItems.length <= 3;
+                          const isOpen =
+                            groupKey in sourceGroupOpen
+                              ? sourceGroupOpen[groupKey]
+                              : defaultOpen;
+                          return (
+                            <SourceGroup
+                              key={groupKey}
+                              domain={domain}
+                              items={sourceItems}
+                              isOpen={isOpen}
+                              onToggle={() => toggleSourceGroup(groupKey, defaultOpen)}
+                              expanded={expanded}
+                              onToggleExpand={toggleExpanded}
+                            />
+                          );
+                        })}
+                      </div>
+                    );
+                  })()
+                )}
               </div>
             ))
           )}
