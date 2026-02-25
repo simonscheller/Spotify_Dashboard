@@ -32,6 +32,9 @@ type Trend = {
   source_page?: string | null;
   page?: string | null;
   page_number?: string | number | null;
+  source?: string | null;
+  source_name?: string | null;
+  newsletter_source?: string | null;
 };
 
 type GroupBy = "week" | "day" | "month";
@@ -145,6 +148,24 @@ function inferPageReference(t: Trend) {
   if (fromUrl?.[1]) return `S. ${fromUrl[1]}`;
 
   return "S. -";
+}
+
+function inferNewsletterSource(t: Trend) {
+  const explicit = [t.newsletter_source, t.source_name, t.source]
+    .map((v) => (v ?? "").toString().trim())
+    .find(Boolean);
+  if (explicit) return explicit;
+
+  const rawUrl = (t.url ?? "").trim();
+  if (!rawUrl) return "Newsletter";
+  try {
+    const host = new URL(rawUrl).hostname.replace(/^www\./i, "");
+    const base = host.split(".")[0] || host;
+    if (!base) return "Newsletter";
+    return base.charAt(0).toUpperCase() + base.slice(1);
+  } catch {
+    return "Newsletter";
+  }
 }
 
 /* ── Page component ──────────────────────────────────────────── */
@@ -488,7 +509,7 @@ export default function Page() {
         r.getCell(3).value = topic || "";
         r.getCell(4).value = relevance || "";
         r.getCell(5).value = summary || "";
-        r.getCell(6).value = "TRENDONE 02/2026";
+        r.getCell(6).value = inferNewsletterSource(t);
         r.getCell(7).value = inferPageReference(t);
 
         r.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: lightGreen } };
