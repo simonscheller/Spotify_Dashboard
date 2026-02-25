@@ -220,7 +220,7 @@ export default function Page() {
     const { data, error } = await supabase
       .from("trends")
       .select(
-        "id, topic, category, relevance_score, summary, spotify_impact, url, published_date, week_number"
+        "id, topic, category, relevance_score, summary, spotify_impact, url, published_date, week_number, newsletter_source, source, source_name, source_page, page, page_number"
       )
       .order("published_date", { ascending: false })
       .order("relevance_score", { ascending: false })
@@ -994,6 +994,7 @@ export default function Page() {
                     const summary = (t.summary ?? "").trim();
                     const impact = (t.spotify_impact ?? "").trim();
                     const url = (t.url ?? "").trim();
+                    const newsletterSource = inferNewsletterSource(t);
                     const category = (t.category ?? "").trim() || "Unkategorisiert";
                     const score = t.relevance_score ?? null;
                     const date = safeDate(t.published_date);
@@ -1037,7 +1038,10 @@ export default function Page() {
                         ) : null}
 
                         {/* Source (always visible) */}
-                        <div className="mt-3">
+                        <div className="mt-3 flex items-center justify-between gap-3">
+                          <p className="text-xs text-muted-foreground">
+                            Quelle: <span className="font-medium text-secondary-foreground">{newsletterSource}</span>
+                          </p>
                           {url ? (
                             <a
                               href={url}
@@ -1046,11 +1050,9 @@ export default function Page() {
                               onClick={(e) => e.stopPropagation()}
                               className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                             >
-                              Quelle öffnen <ExternalLink className="h-4 w-4" />
+                              Link <ExternalLink className="h-4 w-4" />
                             </a>
-                          ) : (
-                            <p className="text-xs text-muted-foreground">Quelle: TRENDONE 02/2026</p>
-                          )}
+                          ) : null}
                         </div>
 
                         {/* Expand toggle */}
