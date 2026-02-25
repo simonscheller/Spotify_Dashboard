@@ -220,7 +220,7 @@ export default function Page() {
     const { data, error } = await supabase
       .from("trends")
       .select(
-        "id, topic, category, relevance_score, summary, spotify_impact, url, published_date, week_number, newsletter_source, source, source_name, source_page, page, page_number"
+        "id, topic, category, relevance_score, summary, spotify_impact, url, published_date, week_number, newsletter_source"
       )
       .order("published_date", { ascending: false })
       .order("relevance_score", { ascending: false })
