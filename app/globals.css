@@ -108,4 +108,71 @@ body {
   .score-badge {
     @apply inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-bold bg-secondary;
   }
+
+  /* Custom range slider — transparent track, styled thumb only */
+  .score-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    height: 20px;
+    position: relative;
+    z-index: 1;
+    width: 100%;
+  }
+  .score-slider::-webkit-slider-runnable-track {
+    background: transparent;
+    height: 8px;
+    border-radius: 9999px;
+  }
+  .score-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--foreground);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(29, 185, 84, 0.3);
+    cursor: pointer;
+    margin-top: -6px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .score-slider:hover::-webkit-slider-thumb,
+  .score-slider:active::-webkit-slider-thumb {
+    transform: scale(1.15);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.6), 0 0 0 4px rgba(29, 185, 84, 0.45);
+  }
+  .score-slider::-moz-range-track {
+    background: transparent;
+    height: 8px;
+    border-radius: 9999px;
+  }
+  .score-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--foreground);
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5), 0 0 0 3px rgba(29, 185, 84, 0.3);
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  .score-slider::-moz-range-thumb:hover {
+    transform: scale(1.15);
+  }
+}
+
+/* KPI card entry animation */
+@keyframes kpi-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.kpi-enter {
+  animation: kpi-enter 0.4s ease-out both;
 }
