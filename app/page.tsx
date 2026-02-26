@@ -560,7 +560,7 @@ export default function Page() {
   }, [normalizedTrends]);
 
   const exportData = useMemo(() => {
-    let rows = normalizedTrends;
+    let rows = filtered;
     if (exportScope === "month" && exportMonth !== "all") {
       rows = rows.filter((t) => {
         const d = safeDate(t.published_date);
@@ -571,7 +571,7 @@ export default function Page() {
       rows = rows.filter((t) => String(t.week_number ?? "") === exportWeek);
     }
     return rows;
-  }, [exportMonth, exportScope, exportWeek, normalizedTrends]);
+  }, [exportMonth, exportScope, exportWeek, filtered]);
 
   const handleExcelExport = useCallback(async () => {
     if (exportData.length === 0 || exporting) return;
