@@ -186,7 +186,7 @@ function TrendCard({ t, isOpen, onToggle }: TrendCardProps) {
         <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{preview}</p>
       ) : null}
 
-      <div className="mt-2 text-xs text-muted-foreground">
+      <div className={cx("mt-2 text-xs text-muted-foreground", !isOpen && "line-clamp-2")}>
         Quelle: <span className="font-medium text-secondary-foreground">{newsletterSource}</span>
       </div>
 
@@ -295,7 +295,7 @@ function SourceGroup({ domain, items, isOpen, onToggle, expanded, onToggleExpand
           ) : null}
           {avgScore !== null ? (
             <span className="text-xs text-muted-foreground">
-              \u00d8&nbsp;{clamp01(avgScore).toFixed(2)}
+              {"Ø"}&nbsp;{clamp01(avgScore).toFixed(2)}
             </span>
           ) : null}
         </div>
@@ -328,7 +328,7 @@ export default function Page() {
   const [groupBy, setGroupBy] = useState<GroupBy>("week");
   const [selectedSlot, setSelectedSlot] = useState<string>("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [minScore, setMinScore] = useState<number>(0);
+  const [minScore, setMinScore] = useState<number>(0.5);
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   /* Dropdown open state */
