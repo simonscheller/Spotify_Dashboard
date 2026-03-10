@@ -956,79 +956,6 @@ export default function Page() {
                 </div>
               </div>
 
-              {/* Excel Export */}
-              <div className="flex flex-wrap items-end gap-3 rounded-xl border border-primary/25 bg-secondary/40 p-3">
-                <div className="space-y-1">
-                  <span className="text-xs font-medium uppercase tracking-wider text-primary">
-                    Excel Export
-                  </span>
-                  <div className="relative">
-                    <select
-                      value={exportScope}
-                      onChange={(e) => setExportScope(e.target.value as ExportScope)}
-                      className="h-10 min-w-[140px] cursor-pointer appearance-none rounded-xl border border-glass-border bg-secondary px-3 pr-9 text-sm text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
-                    >
-                      <option value="all">Alles</option>
-                      <option value="month">Nach Monat</option>
-                      <option value="week">Nach KW</option>
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  </div>
-                </div>
-
-                {exportScope === "month" && (
-                  <div className="space-y-1">
-                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      Monat
-                    </span>
-                    <div className="relative">
-                      <select
-                        value={exportMonth}
-                        onChange={(e) => setExportMonth(e.target.value)}
-                        className="h-10 min-w-[160px] cursor-pointer appearance-none rounded-xl border border-glass-border bg-secondary px-3 pr-9 text-sm text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
-                      >
-                        <option value="all">Alle Monate</option>
-                        {exportMonths.map((m) => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    </div>
-                  </div>
-                )}
-
-                {exportScope === "week" && (
-                  <div className="space-y-1">
-                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      Kalenderwoche
-                    </span>
-                    <div className="relative">
-                      <select
-                        value={exportWeek}
-                        onChange={(e) => setExportWeek(e.target.value)}
-                        className="h-10 min-w-[130px] cursor-pointer appearance-none rounded-xl border border-glass-border bg-secondary px-3 pr-9 text-sm text-foreground outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/30"
-                      >
-                        <option value="all">Alle KWs</option>
-                        {exportWeeks.map((w) => (
-                          <option key={w} value={String(w)}>KW {w}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => void handleExcelExport()}
-                  disabled={exporting || exportData.length === 0}
-                  className="ml-auto inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Download className="h-4 w-4" />
-                  {exporting ? "Exportiere\u2026" : "Excel exportieren"}
-                </button>
-              </div>
-
               {/* Status line */}
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <Calendar className="h-3.5 w-3.5" />
@@ -1046,6 +973,73 @@ export default function Page() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* ── Excel Export ───────────────────────────────────── */}
+        <div className="glass-card flex flex-wrap items-center gap-3 px-4 py-3">
+          <div className="flex items-center gap-2 mr-1">
+            <Download className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold">Excel Export</span>
+          </div>
+
+          <div className="relative">
+            <select
+              value={exportScope}
+              onChange={(e) => setExportScope(e.target.value as ExportScope)}
+              className="h-9 cursor-pointer appearance-none rounded-xl border border-glass-border bg-secondary px-3 pr-8 text-sm text-foreground outline-none transition focus:border-primary/60"
+            >
+              <option value="all">Alles</option>
+              <option value="month">Nach Monat</option>
+              <option value="week">Nach KW</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
+
+          {exportScope === "month" && (
+            <div className="relative">
+              <select
+                value={exportMonth}
+                onChange={(e) => setExportMonth(e.target.value)}
+                className="h-9 cursor-pointer appearance-none rounded-xl border border-glass-border bg-secondary px-3 pr-8 text-sm text-foreground outline-none transition focus:border-primary/60"
+              >
+                <option value="all">Alle Monate</option>
+                {exportMonths.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            </div>
+          )}
+
+          {exportScope === "week" && (
+            <div className="relative">
+              <select
+                value={exportWeek}
+                onChange={(e) => setExportWeek(e.target.value)}
+                className="h-9 cursor-pointer appearance-none rounded-xl border border-glass-border bg-secondary px-3 pr-8 text-sm text-foreground outline-none transition focus:border-primary/60"
+              >
+                <option value="all">Alle KWs</option>
+                {exportWeeks.map((w) => (
+                  <option key={w} value={String(w)}>KW {w}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            </div>
+          )}
+
+          <span className="text-xs text-muted-foreground">
+            {exportData.length} Zeilen
+          </span>
+
+          <button
+            type="button"
+            onClick={() => void handleExcelExport()}
+            disabled={exporting || exportData.length === 0}
+            className="ml-auto inline-flex h-9 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Download className="h-4 w-4" />
+            {exporting ? "Exportiere\u2026" : "Excel exportieren"}
+          </button>
         </div>
 
         {/* ── Search Bar ─────────────────────────────────────── */}
